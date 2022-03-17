@@ -840,7 +840,7 @@ static void __init mm_init(void)
 	report_meminit();
 	kmsan_init_shadow();
 	stack_depot_early_init();
-	mem_init();
+	mem_init();   //初始化物理内存，加入伙伴系统
 	mem_init_print_info();
 	kmem_cache_init();
 	/*
