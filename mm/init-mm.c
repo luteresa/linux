@@ -29,7 +29,7 @@
  */
 struct mm_struct init_mm = {
 	.mm_mt		= MTREE_INIT_EXT(mm_mt, MM_MT_FLAGS, init_mm.mmap_lock),
-	.pgd		= swapper_pg_dir,
+	.pgd		= swapper_pg_dir,  ///启动后的pgd
 	.mm_users	= ATOMIC_INIT(2),
 	.mm_count	= ATOMIC_INIT(1),
 	.write_protect_seq = SEQCNT_ZERO(init_mm.write_protect_seq),
@@ -42,7 +42,7 @@ struct mm_struct init_mm = {
 #ifdef CONFIG_IOMMU_SVA
 	.pasid		= INVALID_IOASID,
 #endif
-	INIT_MM_CONTEXT(init_mm)
+	INIT_MM_CONTEXT(init_mm)   ///初始化过程的地址
 };
 
 void setup_initial_init_mm(void *start_code, void *end_code,
