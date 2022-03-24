@@ -178,10 +178,10 @@ SYSCALL_DEFINE1(brk, unsigned long, brk)
 	LIST_HEAD(uf);
 	MA_STATE(mas, &mm->mm_mt, 0, 0);
 
-	if (mmap_write_lock_killable(mm))
+	if (mmap_write_lock_killable(mm)) ///申请写类型读写信号量
 		return -EINTR;
 
-	origbrk = mm->brk;
+	origbrk = mm->brk;  ///brk记录当前进程动态分配区的底部
 
 #ifdef CONFIG_COMPAT_BRK
 	/*
@@ -220,7 +220,7 @@ SYSCALL_DEFINE1(brk, unsigned long, brk)
 	 * Always allow shrinking brk.
 	 * do_brk_munmap() may downgrade mmap_lock to read.
 	 */
-	if (brk <= mm->brk) {
+	if (brk <= mm->brk) {  ///请求释放空间
 		int ret;
 
 		/* Search one past newbrk */
@@ -254,25 +254,25 @@ SYSCALL_DEFINE1(brk, unsigned long, brk)
 	 */
 	mas_set(&mas, oldbrk);
 	next = mas_find(&mas, newbrk - 1 + PAGE_SIZE + stack_guard_gap);
-	if (next && newbrk + PAGE_SIZE > vm_start_gap(next))
+	if (next && newbrk + PAGE_SIZE > vm_start_gap(next))   ///以旧边界地址去查找vma, 发现有重叠，不需要寻找
 		goto out;
 
 	brkvma = mas_prev(&mas, mm->start_brk);
 	/* Ok, looks good - let it rip. */
-	if (do_brk_flags(&mas, brkvma, oldbrk, newbrk - oldbrk, 0) < 0)
+	if (do_brk_flags(&mas, brkvma, oldbrk, newbrk - oldbrk, 0) < 0)   ///无重叠，新分配一个vma
 		goto out;
 
-	mm->brk = brk;
+	mm->brk = brk;   ///更新brk地址，即当前进程堆的起始地址
 
 success:
-	populate = newbrk > oldbrk && (mm->def_flags & VM_LOCKED) != 0;
+	populate = newbrk > oldbrk && (mm->def_flags & VM_LOCKED) != 0;  ///调用mlockall()系统调用设置VM_LOCKED，锁住进程所有虚拟地址空间，防止内存被交换出去
 	if (downgraded)
 		mmap_read_unlock(mm);
 	else
 		mmap_write_unlock(mm);
 	userfaultfd_unmap_complete(mm, &uf);
 	if (populate)
-		mm_populate(oldbrk, newbrk - oldbrk);
+		mm_populate(oldbrk, newbrk - oldbrk);   ///mm_populate会立刻分配物理内存
 	return brk;
 
 out:
@@ -2931,7 +2931,7 @@ static int do_brk_flags(struct ma_state *mas, struct vm_area_struct *vma,
 	 * Check against address space limits by the changed size
 	 * Note: This happens *after* clearing old mappings in some code paths.
 	 */
-	flags |= VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;
+	flags |= VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;   ///默认属性，可读写
 	if (!may_expand_vm(mm, flags, len >> PAGE_SHIFT))
 		return -ENOMEM;
 

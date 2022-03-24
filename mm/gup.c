@@ -553,9 +553,9 @@ retry:
 	if (unlikely(pmd_bad(*pmd)))
 		return no_page_table(vma, flags);
 
-	ptep = pte_offset_map_lock(mm, pmd, address, &ptl);
+	ptep = pte_offset_map_lock(mm, pmd, address, &ptl);  ///获得pte和一个锁
 	pte = *ptep;
-	if (!pte_present(pte)) {
+	if (!pte_present(pte)) {  ///处理页面不在内存中，作以下处理
 		swp_entry_t entry;
 		/*
 		 * KSM's break_ksm() relies upon recognizing a ksm page
@@ -570,13 +570,13 @@ retry:
 		if (!is_migration_entry(entry))
 			goto no_page;
 		pte_unmap_unlock(ptep, ptl);
-		migration_entry_wait(mm, pmd, address);
+		migration_entry_wait(mm, pmd, address);   ///等待页面合并完成再尝试
 		goto retry;
 	}
 	if (pte_protnone(pte) && !gup_can_follow_protnone(flags))
 		goto no_page;
 
-	page = vm_normal_page(vma, address, pte);
+	page = vm_normal_page(vma, address, pte);   ///根据pte，返回物理页面page(只返回普通页面，特殊页面不参与内存管理)
 
 	/*
 	 * We only care about anon pages in can_follow_write_pte() and don't
@@ -588,7 +588,7 @@ retry:
 		goto out;
 	}
 
-	if (!page && pte_devmap(pte) && (flags & (FOLL_GET | FOLL_PIN))) {
+	if (!page && pte_devmap(pte) && (flags & (FOLL_GET | FOLL_PIN))) {   ///处理设备映射文件
 		/*
 		 * Only return device mapping pages in the FOLL_GET or FOLL_PIN
 		 * case since they are only valid while holding the pgmap
@@ -599,14 +599,14 @@ retry:
 			page = pte_page(pte);
 		else
 			goto no_page;
-	} else if (unlikely(!page)) {
+	} else if (unlikely(!page)) {   ///处理vm_normal_page()没返回有效页面情况
 		if (flags & FOLL_DUMP) {
 			/* Avoid special (like zero) pages in core dumps */
 			page = ERR_PTR(-EFAULT);
 			goto out;
 		}
 
-		if (is_zero_pfn(pte_pfn(pte))) {
+		if (is_zero_pfn(pte_pfn(pte))) {   ///系统零页，不会返回错误
 			page = pte_page(pte);
 		} else {
 			ret = follow_pfn_pte(vma, address, ptep, flags);
@@ -641,7 +641,7 @@ retry:
 			goto out;
 		}
 	}
-	if (flags & FOLL_TOUCH) {
+	if (flags & FOLL_TOUCH) { ///FOLL_TOUCH, 标记页面可访问
 		if ((flags & FOLL_WRITE) &&
 		    !pte_dirty(pte) && !PageDirty(page))
 			set_page_dirty(page);
@@ -871,7 +871,7 @@ static struct page *follow_page_mask(struct vm_area_struct *vma,
 	ctx->page_mask = 0;
 
 	/* make this handle hugepd */
-	page = follow_huge_addr(mm, address, flags & FOLL_WRITE);
+	page = follow_huge_addr(mm, address, flags & FOLL_WRITE); ///处理巨页
 	if (!IS_ERR(page)) {
 		WARN_ON_ONCE(flags & (FOLL_GET | FOLL_PIN));
 		return page;
@@ -895,9 +895,9 @@ static struct page *follow_page_mask(struct vm_area_struct *vma,
 		if (page)
 			return page;
 		return no_page_table(vma, flags);
-	}
+	}  ///处理完巨页
 
-	return follow_p4d_mask(vma, address, pgd, flags, ctx);
+	return follow_p4d_mask(vma, address, pgd, flags, ctx);  ///遍历页表，返回address对应的物理页面page
 }
 
 struct page *follow_page(struct vm_area_struct *vma, unsigned long address,
@@ -1172,14 +1172,14 @@ static long __get_user_pages(struct mm_struct *mm,
 
 	VM_BUG_ON(!!pages != !!(gup_flags & (FOLL_GET | FOLL_PIN)));
 
-	do {
+	do {   ///依次处理每个页面
 		struct page *page;
 		unsigned int foll_flags = gup_flags;
 		unsigned int page_increm;
 
 		/* first iteration or cross vma bound */
 		if (!vma || start >= vma->vm_end) {
-			vma = find_extend_vma(mm, start);
+			vma = find_extend_vma(mm, start);  ///检查是否可以扩增vma
 			if (!vma && in_gate_area(mm, start)) {
 				ret = get_gate_page(mm, start & PAGE_MASK,
 						gup_flags, &vma,
@@ -1198,7 +1198,7 @@ static long __get_user_pages(struct mm_struct *mm,
 			if (ret)
 				goto out;
 
-			if (is_vm_hugetlb_page(vma)) {
+			if (is_vm_hugetlb_page(vma)) {  ///支持巨页
 				i = follow_hugetlb_page(mm, vma, pages, vmas,
 						&start, &nr_pages, i,
 						gup_flags, locked);
@@ -1219,16 +1219,17 @@ retry:
 		 * If we have a pending SIGKILL, don't keep faulting pages and
 		 * potentially allocating memory.
 		 */
-		if (fatal_signal_pending(current)) {
+		if (fatal_signal_pending(current)) {  ///如果当前进程收到SIGKILL信号，直接退出
 			ret = -EINTR;
 			goto out;
 		}
-		cond_resched();
+		cond_resched();  //判断是否需要调度，内核中常用该函数，优化系统延迟
 
-		page = follow_page_mask(vma, start, foll_flags, &ctx);
+		page = follow_page_mask(vma, start, foll_flags, &ctx);   ///查看VMA的虚拟页面是否已经分配物理内存，返回已经映射的页面的page
+
 		if (!page || PTR_ERR(page) == -EMLINK) {
 			ret = faultin_page(vma, start, &foll_flags,
-					   PTR_ERR(page) == -EMLINK, locked);
+					   PTR_ERR(page) == -EMLINK, locked);   ///若无映射，主动触发虚拟页面到物理页面的映射
 			switch (ret) {
 			case 0:
 				goto retry;
@@ -1261,7 +1262,7 @@ retry:
 		}
 		if (pages) {
 			pages[i] = page;
-			flush_anon_page(vma, page, start);
+			flush_anon_page(vma, page, start);  ///分配完物理页面，刷新缓存
 			flush_dcache_page(page);
 			ctx.page_mask = 0;
 		}
@@ -1585,7 +1586,7 @@ long populate_vma_page_range(struct vm_area_struct *vma,
 	 * not result in a stack expansion that recurses back here.
 	 */
 	ret = __get_user_pages(mm, start, nr_pages, gup_flags,
-				NULL, NULL, locked);
+				NULL, NULL, locked);   ///为进程地址空间分配物理内存并且建立映射关系
 	lru_add_drain();
 	return ret;
 }
@@ -1698,7 +1699,7 @@ int __mm_populate(unsigned long start, unsigned long len, int ignore_errors)
 		 * double checks the vma flags, so that it won't mlock pages
 		 * if the vma was already munlocked.
 		 */
-		ret = populate_vma_page_range(vma, nstart, nend, &locked);
+		ret = populate_vma_page_range(vma, nstart, nend, &locked);    ///人为制造缺页异常，并完成页表映射
 		if (ret < 0) {
 			if (ignore_errors) {
 				ret = 0;
