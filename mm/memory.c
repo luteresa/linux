@@ -3053,7 +3053,7 @@ static inline void wp_page_reuse(struct vm_fault *vmf)
 	__releases(vmf->ptl)
 {
 	struct vm_area_struct *vma = vmf->vma;
-	struct page *page = vmf->page;
+	struct page *page = vmf->page;   ///获取缺页异常页面
 	pte_t entry;
 
 	VM_BUG_ON(!(vmf->flags & FAULT_FLAG_WRITE));
@@ -3067,10 +3067,10 @@ static inline void wp_page_reuse(struct vm_fault *vmf)
 	if (page)
 		page_cpupid_xchg_last(page, (1 << LAST_CPUPID_SHIFT) - 1);
 
-	flush_cache_page(vma, vmf->address, pte_pfn(vmf->orig_pte));
-	entry = pte_mkyoung(vmf->orig_pte);
-	entry = maybe_mkwrite(pte_mkdirty(entry), vma);
-	if (ptep_set_access_flags(vma, vmf->address, vmf->pte, entry, 1))
+	flush_cache_page(vma, vmf->address, pte_pfn(vmf->orig_pte));  	   ///刷新缺页异常页面的高速缓存
+	entry = pte_mkyoung(vmf->orig_pte);                           	   ///设置PTE的AF位
+	entry = maybe_mkwrite(pte_mkdirty(entry), vma);               	   ///设置可写，置脏位
+	if (ptep_set_access_flags(vma, vmf->address, vmf->pte, entry, 1))  ///设置新PTE到实际页表中
 		update_mmu_cache(vma, vmf->address, vmf->pte);
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
 	count_vm_event(PGREUSE);
@@ -3142,6 +3142,7 @@ static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 	cgroup_throttle_swaprate(new_page, GFP_KERNEL);
 
 	__SetPageUptodate(new_page);   ///设置PG_uptodate, 表示内容有效
+	
 	///注册一个mmu_notifier，并告知系统使dd_page无效
 	mmu_notifier_range_init(&range, MMU_NOTIFY_CLEAR, 0, vma, mm,
 				vmf->address & PAGE_MASK,
@@ -3154,10 +3155,10 @@ static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 	vmf->pte = pte_offset_map_lock(mm, vmf->pmd, vmf->address, &vmf->ptl);
 	if (likely(pte_same(*vmf->pte, vmf->orig_pte))) {
 		if (old_page) {
-			if (!PageAnon(old_page)) {
+			if (!PageAnon(old_page)) {   ///如果oldpage是文件映射
 				dec_mm_counter_fast(mm,
-						mm_counter_file(old_page));
-				inc_mm_counter_fast(mm, MM_ANONPAGES);
+						mm_counter_file(old_page));     ///减少一个文件映射页面技术
+				inc_mm_counter_fast(mm, MM_ANONPAGES);  ///增加匿名页面计数
 			}
 		} else {
 			inc_mm_counter_fast(mm, MM_ANONPAGES);
@@ -3192,7 +3193,7 @@ static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 		BUG_ON(unshare && pte_write(entry));
 		set_pte_at_notify(mm, vmf->address, vmf->pte, entry);   ///新pte设置到硬件PTE中
 		update_mmu_cache(vma, vmf->address, vmf->pte);
-		if (old_page) {
+		if (old_page) {   ///准备释放old_page，真正释放操作在page_cache_release()函数
 			/*
 			 * Only after switching the pte to the new page may
 			 * we remove the mapcount here. Otherwise another
@@ -3390,7 +3391,7 @@ static vm_fault_t do_wp_page(struct vm_fault *vmf)
 	}
 
 	vmf->page = vm_normal_page(vma, vmf->address, vmf->orig_pte);   ///查找缺页异常地址对应页面的page数据结构，返回为NULL,说明是一个特殊页面
-	if (!vmf->page) {
+	if (!vmf->page) {   ///处理特殊页面
 		if (unlikely(unshare)) {
 			/* No anonymous page -> nothing to do. */
 			pte_unmap_unlock(vmf->pte, vmf->ptl);
@@ -3405,11 +3406,11 @@ static vm_fault_t do_wp_page(struct vm_fault *vmf)
 		 * Just mark the pages writable and/or call ops->pfn_mkwrite.
 		 */
 		if ((vma->vm_flags & (VM_WRITE|VM_SHARED)) ==
-				     (VM_WRITE|VM_SHARED))
-			return wp_pfn_shared(vmf); 
+				     (VM_WRITE|VM_SHARED))   ///特殊页面，且vma是可写且共享
+			return wp_pfn_shared(vmf);   ///复用
 
 		pte_unmap_unlock(vmf->pte, vmf->ptl);
-		return wp_page_copy(vmf);
+		return wp_page_copy(vmf); ///vma不是可写共享页面，写时拷贝
 	}
 
 	/*
@@ -3462,7 +3463,7 @@ reuse:
 			pte_unmap_unlock(vmf->pte, vmf->ptl);
 			return 0;
 		}
-		wp_page_reuse(vmf);
+		wp_page_reuse(vmf);   ///PageAnon判断是否为匿名页面，且不为KSM匿名页面, 复用
 		return VM_FAULT_WRITE;
 	} else if (unshare) {
 		/* No anonymous page -> nothing to do. */
@@ -3470,7 +3471,7 @@ reuse:
 		return 0;
 	} else if (unlikely((vma->vm_flags & (VM_WRITE|VM_SHARED)) ==
 					(VM_WRITE|VM_SHARED))) {
-		return wp_page_shared(vmf);
+		return wp_page_shared(vmf); ///处理可写的共享页面，复用
 	}
 copy:
 	/*
@@ -3483,7 +3484,7 @@ copy:
 	if (PageKsm(vmf->page))
 		count_vm_event(COW_KSM);
 #endif
-	return wp_page_copy(vmf);   ///处理写时复制
+	return wp_page_copy(vmf);   ///处理写时复制的情况
 }
 
 static void unmap_mapping_range_vma(struct vm_area_struct *vma,
@@ -3739,7 +3740,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	if (!pte_unmap_same(vmf))
 		goto out;
 
-	entry = pte_to_swp_entry(vmf->orig_pte);
+	entry = pte_to_swp_entry(vmf->orig_pte);  ///获取换出页标识符
 	if (unlikely(non_swap_entry(entry))) {
 		if (is_migration_entry(entry)) {
 			migration_entry_wait(vma->vm_mm, vmf->pmd,
