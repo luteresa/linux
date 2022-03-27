@@ -3741,7 +3741,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 		goto out;
 
 	entry = pte_to_swp_entry(vmf->orig_pte);  ///获取换出页标识符
-	if (unlikely(non_swap_entry(entry))) {
+	if (unlikely(non_swap_entry(entry))) {   ///非换出页标识符，处理迁移页面，复用swap机制
 		if (is_migration_entry(entry)) {
 			migration_entry_wait(vma->vm_mm, vmf->pmd,
 					     vmf->address);
@@ -3790,7 +3790,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 
 	if (!folio) {
 		if (data_race(si->flags & SWP_SYNCHRONOUS_IO) &&
-		    __swap_count(entry) == 1) {
+		    __swap_count(entry) == 1) { ///需要启动慢速IO操作，此时根据局部性原理，还做预取动作来优化性能
 			/* skip swapcache */
 			folio = vma_alloc_folio(GFP_HIGHUSER_MOVABLE, 0,
 						vma, vmf->address, false);
@@ -3811,15 +3811,15 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 				if (shadow)
 					workingset_refault(folio, shadow);
 
-				folio_add_lru(folio);
+				folio_add_lru(folio);  ///page加入swap_cache
 
 				/* To provide entry to swap_readpage() */
 				folio_set_swap_entry(folio, entry);
-				swap_readpage(page, true, NULL);
+				swap_readpage(page, true, NULL);   ///从swap文件读取数据到page
 				folio->private = NULL;
 			}
 		} else {
-			page = swapin_readahead(entry, GFP_HIGHUSER_MOVABLE,
+			page = swapin_readahead(entry, GFP_HIGHUSER_MOVABLE,  ///从swap文件读取数据到page
 						vmf);
 			if (page)
 				folio = page_folio(page);
@@ -3839,7 +3839,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 		}
 
 		/* Had to read the page from swap area: Major fault */
-		ret = VM_FAULT_MAJOR;
+		ret = VM_FAULT_MAJOR;  ///需要启动慢速IO操作，标记为主缺页
 		count_vm_event(PGMAJFAULT);
 		count_memcg_event_mm(vma->vm_mm, PGMAJFAULT);
 	} else if (PageHWPoison(page)) {
@@ -3898,6 +3898,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	/*
 	 * Back out if somebody else already faulted in this pte.
 	 */
+///重新获取页表项
 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
 			&vmf->ptl);
 	if (unlikely(!pte_same(*vmf->pte, vmf->orig_pte)))
@@ -3968,9 +3969,9 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	if (should_try_to_free_swap(folio, vma, vmf->flags))
 		folio_free_swap(folio);
 
-	inc_mm_counter_fast(vma->vm_mm, MM_ANONPAGES);
-	dec_mm_counter_fast(vma->vm_mm, MM_SWAPENTS);
-	pte = mk_pte(page, vma->vm_page_prot);
+	inc_mm_counter_fast(vma->vm_mm, MM_ANONPAGES);   ///匿页也计数增加
+	dec_mm_counter_fast(vma->vm_mm, MM_SWAPENTS);    ///swap页面技术减少
+	pte = mk_pte(page, vma->vm_page_prot);           ///拼接页表项
 
 	/*
 	 * Same logic as in do_wp_page(); however, optimize for pages that are
@@ -3994,6 +3995,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 		pte = pte_mkuffd_wp(pte);
 		pte = pte_wrprotect(pte);
 	}
+<<<<<<< HEAD
 	vmf->orig_pte = pte;
 
 	/* ksm created a completely new copy */
@@ -4023,8 +4025,8 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 		folio_put(swapcache);
 	}
 
-	if (vmf->flags & FAULT_FLAG_WRITE) {
-		ret |= do_wp_page(vmf);
+	if (vmf->flags & FAULT_FLAG_WRITE) {   ///处理私有匿名页
+		ret |= do_wp_page(vmf);            ///写时复制
 		if (ret & VM_FAULT_ERROR)
 			ret &= VM_FAULT_ERROR;
 		goto out;
