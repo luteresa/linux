@@ -452,11 +452,11 @@ struct rmap_walk_control {
 	 * Otherwise, return true.
 	 */
 	bool (*rmap_one)(struct folio *folio, struct vm_area_struct *vma,
-					unsigned long addr, void *arg);
-	int (*done)(struct folio *folio);
+					unsigned long addr, void *arg);                 ///断开某个vma上映射的PTE
+	int (*done)(struct folio *folio);                               ///判断是否断开成功
 	struct anon_vma *(*anon_lock)(struct folio *folio,
 				      struct rmap_walk_control *rwc);
-	bool (*invalid_vma)(struct vm_area_struct *vma, void *arg);
+	bool (*invalid_vma)(struct vm_area_struct *vma, void *arg);     ///跳过无效的vma
 };
 
 void rmap_walk(struct folio *folio, struct rmap_walk_control *rwc);
