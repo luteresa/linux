@@ -614,6 +614,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 	if (retval)
 		goto out;
 
+///遍历父进程所有的VMA
 	mas_for_each(&old_mas, mpnt, ULONG_MAX) {
 		struct file *file;
 
@@ -637,6 +638,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 				goto fail_nomem;
 			charge = len;
 		}
+		///新建一个临时vma，拷贝父进程vma数据结构的内容
 		tmp = vm_area_dup(mpnt);
 		if (!tmp)
 			goto fail_nomem;
@@ -654,7 +656,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 			 * copy page for current vma.
 			 */
 			tmp->anon_vma = NULL;
-		} else if (anon_vma_fork(tmp, mpnt))
+		} else if (anon_vma_fork(tmp, mpnt))  ///为子进程创建anon_vma数据结构
 			goto fail_nomem_anon_vma_fork;
 		tmp->vm_flags &= ~(VM_LOCKED | VM_LOCKONFAULT);
 		file = tmp->vm_file;
@@ -688,7 +690,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 
 		mm->map_count++;
 		if (!(tmp->vm_flags & VM_WIPEONFORK))
-			retval = copy_page_range(tmp, mpnt);  ///拷贝vma
+			retval = copy_page_range(tmp, mpnt);  ///将父进程的PTE拷贝到子进程页表中
 
 		if (tmp->vm_ops && tmp->vm_ops->open)
 			tmp->vm_ops->open(tmp);
