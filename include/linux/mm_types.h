@@ -446,7 +446,7 @@ struct anon_vma_name {
 struct vm_area_struct {
 	/* The first cache line has the info for VMA tree walking. */
 
-	unsigned long vm_start;		/* Our start address within vm_mm. */
+	unsigned long vm_start;		/* Our start address within vm_mm. */  ///VMA在进程地址空间内的起始地址，结束地址
 	unsigned long vm_end;		/* The first byte after our end address
 					   within vm_mm. */
 
@@ -456,8 +456,8 @@ struct vm_area_struct {
 	 * Access permissions of this VMA.
 	 * See vmf_insert_mixed_prot() for discussion.
 	 */
-	pgprot_t vm_page_prot;
-	unsigned long vm_flags;		/* Flags, see mm.h. */
+	pgprot_t vm_page_prot;  ///vma的访问权限
+	unsigned long vm_flags;		/* Flags, see mm.h. */  ///描述该vma的一组标志位
 
 	/*
 	 * For areas with an address space and backing store,
@@ -490,12 +490,12 @@ struct vm_area_struct {
 	struct anon_vma *anon_vma;	/* Serialized by page_table_lock */   ///指向anon_vma
 
 	/* Function pointers to deal with this struct. */
-	const struct vm_operations_struct *vm_ops;
+	const struct vm_operations_struct *vm_ops;   ///指向操作方法集合，常用在文件映射
 
 	/* Information about our backing store: */
-	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE
+	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE  ///指定文件映射的偏移量，单位页
 					   units */
-	struct file * vm_file;		/* File we map to (can be NULL). */
+	struct file * vm_file;		/* File we map to (can be NULL). */  ///指向映射的文件
 	void * vm_private_data;		/* was vm_pte (shared mem) */
 
 #ifdef CONFIG_SWAP
@@ -517,9 +517,9 @@ struct mm_struct {
 #ifdef CONFIG_MMU
 		unsigned long (*get_unmapped_area) (struct file *filp,
 				unsigned long addr, unsigned long len,
-				unsigned long pgoff, unsigned long flags);
+				unsigned long pgoff, unsigned long flags);   ///判断虚拟内存空间是否有足够空间，返回一段没有映射过的虚拟空间起始地址
 #endif
-		unsigned long mmap_base;	/* base of mmap area */
+		unsigned long mmap_base;	/* base of mmap area */  ///mmap空间起始地址
 		unsigned long mmap_legacy_base;	/* base of mmap area in bottom-up allocations */
 #ifdef CONFIG_HAVE_ARCH_COMPAT_MMAP_BASES
 		/* Base addresses for compatible mmap() */
@@ -527,7 +527,7 @@ struct mm_struct {
 		unsigned long mmap_compat_legacy_base;
 #endif
 		unsigned long task_size;	/* size of task vm space */
-		pgd_t * pgd;
+		pgd_t * pgd;   ///一级页表
 
 #ifdef CONFIG_MEMBARRIER
 		/**
@@ -548,7 +548,7 @@ struct mm_struct {
 		 * @mm_count (which may then free the &struct mm_struct if
 		 * @mm_count also drops to 0).
 		 */
-		atomic_t mm_users;
+		atomic_t mm_users;  ///正在使用该进程空间的线程数目
 
 		/**
 		 * @mm_count: The number of references to &struct mm_struct
@@ -557,7 +557,7 @@ struct mm_struct {
 		 * Use mmgrab()/mmdrop() to modify. When this drops to 0, the
 		 * &struct mm_struct is freed.
 		 */
-		atomic_t mm_count;
+		atomic_t mm_count; ///mm_struct结构体的主引用计数
 
 #ifdef CONFIG_MMU
 		atomic_long_t pgtables_bytes;	/* PTE page table pages */
@@ -579,8 +579,9 @@ struct mm_struct {
 		 * mmap_lock, which can easily push the 2 fields into one
 		 * cacheline.
 		 */
-		struct rw_semaphore mmap_lock;
+		struct rw_semaphore mmap_lock;  ///保护vma的读写信号量
 
+///所有的mm_struct结构都连接到一个双向链表中，链表头是init_mm内存描述符
 		struct list_head mmlist; /* List of maybe swapped mm's.	These
 					  * are globally strung together off
 					  * init_mm.mmlist, and are protected
@@ -591,7 +592,7 @@ struct mm_struct {
 		unsigned long hiwater_rss; /* High-watermark of RSS usage */
 		unsigned long hiwater_vm;  /* High-water virtual memory usage */
 
-		unsigned long total_vm;	   /* Total pages mapped */
+		unsigned long total_vm;	   /* Total pages mapped */    ///已经使用的进程地址空间总和
 		unsigned long locked_vm;   /* Pages that have PG_mlocked set */
 		atomic64_t    pinned_vm;   /* Refcount permanently increased */
 		unsigned long data_vm;	   /* VM_WRITE & ~VM_SHARED & ~VM_STACK */
@@ -607,9 +608,8 @@ struct mm_struct {
 		seqcount_t write_protect_seq;
 
 		spinlock_t arg_lock; /* protect the below fields */
-
-		unsigned long start_code, end_code, start_data, end_data;
-		unsigned long start_brk, brk, start_stack;
+		unsigned long start_code, end_code, start_data, end_data;   ///代码段，数据段的起始地址和结束地址
+		unsigned long start_brk, brk, start_stack;                  ///start_brk：堆空间的起始地址，brk:当前堆中vma的结束地址
 		unsigned long arg_start, arg_end, env_start, env_end;
 
 		unsigned long saved_auxv[AT_VECTOR_SIZE]; /* for /proc/PID/auxv */
