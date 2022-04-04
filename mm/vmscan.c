@@ -1443,6 +1443,14 @@ enum folio_references {
 	FOLIOREF_ACTIVATE,
 };
 
+/*******************************************************************************
+ * func:扫描不活跃链表时，会被调用;返回page_references页面行为类型
+ * 
+ * 当页面有访问，引用了PTE时，要放回到活跃LRU链表的情况有:
+ * (1)页面是匿名页面(PageSwapBacked(page));
+ * (2)页面位于最近第二次访问的文件缓存，或共享的文件缓存中；
+ * (3)页面位于可执行文件的缓存中；
+ ******************************************************************************/
 static enum folio_references folio_check_references(struct folio *folio,
 						  struct scan_control *sc)
 {
@@ -1450,8 +1458,8 @@ static enum folio_references folio_check_references(struct folio *folio,
 	unsigned long vm_flags;
 
 	referenced_ptes = folio_referenced(folio, 1, sc->target_mem_cgroup,
-					   &vm_flags);
-	referenced_folio = folio_test_clear_referenced(folio);
+					   &vm_flags);                                 ///检查页面，引用了多少个PTE(referenced_ptes)
+	referenced_folio = folio_test_clear_referenced(folio);         ///返回PG_referenced的值，并清除PG_referenced标记
 
 	/*
 	 * The supposedly reclaimable folio was found to be in a VM_LOCKED vma.
@@ -1481,7 +1489,7 @@ static enum folio_references folio_check_references(struct folio *folio,
 		 */
 		folio_set_referenced(folio);
 
-		if (referenced_folio || referenced_ptes > 1)
+		if (referenced_folio || referenced_ptes > 1)   ///referenced_ptes多个vma映射，放入活跃链表
 			return FOLIOREF_ACTIVATE;
 
 		/*
@@ -1490,7 +1498,7 @@ static enum folio_references folio_check_references(struct folio *folio,
 		if ((vm_flags & VM_EXEC) && folio_is_file_lru(folio))
 			return FOLIOREF_ACTIVATE;
 
-		return FOLIOREF_KEEP;
+		return FOLIOREF_KEEP;   ///第一次访问的文件缓存的页面继续放在不活跃LRU链表
 	}
 
 	/* Reclaim if clean, defer dirty folios to writeback */

@@ -506,7 +506,7 @@ static inline void lru_gen_exit_memcg(struct mem_cgroup *memcg)
 #endif /* CONFIG_LRU_GEN */
 
 struct lruvec {
-	struct list_head		lists[NR_LRU_LISTS];
+	struct list_head		lists[NR_LRU_LISTS]; ///LRU链表数组，每个内存节点都有5种类型LRU链表
 	/* per lruvec lru_lock for memcg */
 	spinlock_t			lru_lock;
 	/*
@@ -1222,7 +1222,7 @@ typedef struct pglist_data {
 	 *
 	 * Use mem_cgroup_lruvec() to look up lruvecs.
 	 */
-	struct lruvec		__lruvec;
+	struct lruvec		__lruvec;  ///lru链表向量(包括所有，5种lru链表)
 
 	unsigned long		flags;
 

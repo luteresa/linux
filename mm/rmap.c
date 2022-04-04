@@ -819,7 +819,7 @@ static bool folio_referenced_one(struct folio *folio,
 	DEFINE_FOLIO_VMA_WALK(pvmw, folio, vma, address, 0);
 	int referenced = 0;
 
-	while (page_vma_mapped_walk(&pvmw)) {
+	while (page_vma_mapped_walk(&pvmw)) {  ///遍历页表，找出对应PTE
 		address = pvmw.address;
 
 		if ((vma->vm_flags & VM_LOCKED) &&
@@ -827,7 +827,7 @@ static bool folio_referenced_one(struct folio *folio,
 			/* Restore the mlock which got missed */
 			mlock_vma_folio(folio, vma, !pvmw.pte);
 			page_vma_mapped_walk_done(&pvmw);
-			pra->vm_flags |= VM_LOCKED;
+			pra->vm_flags |= VM_LOCKED;    ///内存锁定，直接返回
 			return false; /* To break the loop */
 		}
 
@@ -839,7 +839,7 @@ static bool folio_referenced_one(struct folio *folio,
 			}
 
 			if (ptep_clear_flush_young_notify(vma, address,
-						pvmw.pte)) {
+						pvmw.pte)) {      ///判断是否访问过，若有，referenced++，清除PTE_AF,刷新页面TLB
 				/*
 				 * Don't treat a reference through
 				 * a sequentially read mapping as such.
@@ -848,7 +848,7 @@ static bool folio_referenced_one(struct folio *folio,
 				 * already gone, the unmap path will have set
 				 * the referenced flag or activated the folio.
 				 */
-				if (likely(!(vma->vm_flags & VM_SEQ_READ)))
+				if (likely(!(vma->vm_flags & VM_SEQ_READ)))    ///循序读，做弱访问引用处理，适合回收
 					referenced++;
 			}
 		} else if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE)) {
@@ -902,6 +902,8 @@ static bool invalid_folio_referenced_vma(struct vm_area_struct *vma, void *arg)
  * Return: The number of mappings which referenced the folio. Return -1 if
  * the function bailed out due to rmap lock contention.
  */
+ ///判断页面是否被访问过过，并返回引用的PTE个数，即引用这个page的用户进程空间虚拟页面的个数
+ ///就是利用rmap系统来统计访问、引用PTE的个数
 int folio_referenced(struct folio *folio, int is_locked,
 		     struct mem_cgroup *memcg, unsigned long *vm_flags)
 {
@@ -917,11 +919,11 @@ int folio_referenced(struct folio *folio, int is_locked,
 		.try_lock = true,
 	};
 
-	*vm_flags = 0;
-	if (!pra.mapcount)
+	*vm_flags = 0; 
+	if (!pra.mapcount)  ///判断_mapcount是否大于等于0
 		return 0;
 
-	if (!folio_raw_mapping(folio))
+	if (!folio_raw_mapping(folio))   ///判断page->mapping是否有地址空间映射
 		return 0;
 
 	if (!is_locked && (!folio_test_anon(folio) || folio_test_ksm(folio))) {
@@ -939,7 +941,7 @@ int folio_referenced(struct folio *folio, int is_locked,
 		rwc.invalid_vma = invalid_folio_referenced_vma;
 	}
 
-	rmap_walk(folio, &rwc);
+	rmap_walk(folio, &rwc);   ///遍历映射page的所有PTE，调用rmap_one()函数
 	*vm_flags = pra.vm_flags;
 
 	if (we_locked)

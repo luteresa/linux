@@ -472,6 +472,7 @@ static void folio_inc_refs(struct folio *folio)
  * When a newly allocated page is not yet visible, so safe for non-atomic ops,
  * __SetPageReferenced(page) may be substituted for mark_page_accessed(page).
  */
+///若页框被访问，被调用
 void folio_mark_accessed(struct folio *folio)
 {
 	if (lru_gen_enabled()) {
@@ -479,7 +480,7 @@ void folio_mark_accessed(struct folio *folio)
 		return;
 	}
 
-	if (!folio_test_referenced(folio)) {
+	if (!folio_test_referenced(folio)) {   ///PG_referenced==0，置1
 		folio_set_referenced(folio);
 	} else if (folio_test_unevictable(folio)) {
 		/*
@@ -487,7 +488,7 @@ void folio_mark_accessed(struct folio *folio)
 		 * this list is never rotated or maintained, so marking an
 		 * unevictable page accessed has no effect.
 		 */
-	} else if (!folio_test_active(folio)) {
+	} else if (!folio_test_active(folio)) {   ///页面被访问，但不是活跃，将访问位清零，加入到活跃链表
 		/*
 		 * If the folio is on the LRU, queue it for activation via
 		 * cpu_fbatches.activate. Otherwise, assume the folio is in a
