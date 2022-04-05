@@ -3125,7 +3125,7 @@ int insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma)
 {
 	unsigned long charged = vma_pages(vma);
 
-
+///查找要插入的位置
 	if (find_vma_intersection(mm, vma->vm_start, vma->vm_end))
 		return -ENOMEM;
 
@@ -3145,12 +3145,12 @@ int insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma)
 	 * using the existing file pgoff checks and manipulations.
 	 * Similarly in do_mmap and in do_brk_flags.
 	 */
-	if (vma_is_anonymous(vma)) {
+	if (vma_is_anonymous(vma)) {   ///判断是否为匿名页
 		BUG_ON(vma->anon_vma);
 		vma->vm_pgoff = vma->vm_start >> PAGE_SHIFT;
 	}
 
-	if (vma_link(mm, vma)) {
+	if (vma_link(mm, vma)) {   //将vma插入mm的vma链表中
 		vm_unacct_memory(charged);
 		return -ENOMEM;
 	}

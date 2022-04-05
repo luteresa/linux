@@ -450,7 +450,7 @@ struct vm_area_struct {
 	unsigned long vm_end;		/* The first byte after our end address
 					   within vm_mm. */
 
-	struct mm_struct *vm_mm;	/* The address space we belong to. */
+	struct mm_struct *vm_mm;	/* The address space we belong to. */   ///指向vma所属进程的mm_struct
 
 	/*
 	 * Access permissions of this VMA.
@@ -527,7 +527,7 @@ struct mm_struct {
 		unsigned long mmap_compat_legacy_base;
 #endif
 		unsigned long task_size;	/* size of task vm space */
-		pgd_t * pgd;   ///一级页表
+		pgd_t * pgd;   ///指向进程一级页表
 
 #ifdef CONFIG_MEMBARRIER
 		/**
