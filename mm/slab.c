@@ -183,6 +183,7 @@ typedef unsigned short freelist_idx_t;
  *
  */
  /*
+  * slab描述符给每一个CPU提供一个对象缓存池
   * 本地对象缓存池
   * 让对象尽可能的使用在同一个CPU上的cache，提高效率
   * 不需要额外自旋锁，避免锁竞争；
@@ -191,12 +192,17 @@ struct array_cache {
 	unsigned int avail;       ///对象缓冲池中可用的对象数目
 	unsigned int limit;       ///对象缓冲池可用对象数目的最大阈值
 	unsigned int batchcount;  ///迁移对象数目
-	unsigned int touched;     ///表示这个对象缓冲池最近使用过
+
+	 ///表示这个对象缓冲池最近使用过
+	 ///从缓冲池移除一个对象时，touched置1；收缩缓存时，touched清零
+	unsigned int touched;    
+
+	///指向存储对象的变长数组，每个成员存放一个对象实体的指针，最多有limit个成员
 	void *entry[];	/*
 			 * Must have this definition in here for the proper
 			 * alignment of array_cache. Also simplifies accessing
 			 * the entries.
-			 */  ///指向存储对象的变长数组，每个成员存放一个对象的指针，最多有limit个成员
+			 */  
 };
 
 struct alien_cache {
@@ -823,12 +829,14 @@ static int init_cache_node(struct kmem_cache *cachep, int node, gfp_t gfp)
 
 		return 0;
 	}
-
-	n = kmalloc_node(sizeof(struct kmem_cache_node), gfp, node);
+	
+	///新分配一个kmem_cache_node节点，slab节点
+	n = kmalloc_node(sizeof(struct kmem_cache_node), gfp, node);   
 	if (!n)
 		return -ENOMEM;
-
-	kmem_cache_node_init(n);
+	
+	///kmem_cache_node节点包含三个链表：部分空闲链表，完全用尽链表，空闲链表
+	kmem_cache_node_init(n); 
 	n->next_reap = jiffies + REAPTIMEOUT_NODE +
 		    ((unsigned long)cachep) % REAPTIMEOUT_NODE;
 
@@ -2060,7 +2068,7 @@ done:
 		cachep->allocflags |= GFP_DMA32;
 	if (flags & SLAB_RECLAIM_ACCOUNT)
 		cachep->allocflags |= __GFP_RECLAIMABLE;
-	cachep->size = size;
+	cachep->size = size;  ///一个slab对象的大小
 	cachep->reciprocal_buffer_size = reciprocal_value(size);
 
 #if DEBUG
@@ -2506,7 +2514,7 @@ static void cache_init_objs(struct kmem_cache *cachep,
 		}
 
 		if (!shuffled)
-			set_free_obj(slab, i, i);
+			set_free_obj(slab, i, i);   ///把对象的序号填入freelist数组中
 	}
 }
 
@@ -2575,6 +2583,7 @@ static struct slab *cache_grow_begin(struct kmem_cache *cachep,
 	 * Get mem for the objs.  Attempt to allocate a physical page from
 	 * 'nodeid'.
 	 */
+///分配分配器所需的物理页面
 	slab = kmem_getpages(cachep, local_flags, nodeid);
 	if (!slab)
 		goto failed;
@@ -3025,7 +3034,7 @@ static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 	}
 
 	STATS_INC_ALLOCMISS(cachep);
-	objp = cache_alloc_refill(cachep, flags);  ///第一次为分配物理内存，在这里向向伙伴系统申请内存
+	objp = cache_alloc_refill(cachep, flags);  ///第一次未分配物理内存，在这里向向伙伴系统申请内存
 	/*
 	 * the 'ac' may be updated by cache_alloc_refill(),
 	 * and kmemleak_erase() requires its correct value.
@@ -3443,7 +3452,7 @@ void ___cache_free(struct kmem_cache *cachep, void *objp,
 		}
 	}
 
-	__free_one(ac, objp);  ///对象释放到本地对象缓冲池ac中
+	__free_one(ac, objp);  ///对象释放到本地对象缓冲池ac中,实际不一定会释放
 }
 
 static __always_inline
