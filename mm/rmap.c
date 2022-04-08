@@ -822,9 +822,11 @@ static bool folio_referenced_one(struct folio *folio,
 	DEFINE_FOLIO_VMA_WALK(pvmw, folio, vma, address, 0);
 	int referenced = 0;
 
-	while (page_vma_mapped_walk(&pvmw)) {  ///遍历页表，找出对应PTE
+	///遍历页表，找出对应PTE
+	while (page_vma_mapped_walk(&pvmw)) {  
 		address = pvmw.address;
 
+		///内存锁定，直接返回
 		if ((vma->vm_flags & VM_LOCKED) &&
 		    (!folio_test_large(folio) || !pvmw.pte)) {
 			/* Restore the mlock which got missed */
@@ -842,7 +844,7 @@ static bool folio_referenced_one(struct folio *folio,
 			}
 
 			if (ptep_clear_flush_young_notify(vma, address,
-						pvmw.pte)) {      ///判断是否访问过，若有，referenced++，清除PTE_AF,刷新页面TLB
+						pvmw.pte)) {     
 				/*
 				 * Don't treat a reference through
 				 * a sequentially read mapping as such.
@@ -851,7 +853,8 @@ static bool folio_referenced_one(struct folio *folio,
 				 * already gone, the unmap path will have set
 				 * the referenced flag or activated the folio.
 				 */
-				if (likely(!(vma->vm_flags & VM_SEQ_READ)))    ///循序读，做弱访问引用处理，适合回收
+				 ///循序读，做弱访问引用处理，适合回收
+				if (likely(!(vma->vm_flags & VM_SEQ_READ)))    
 					referenced++;
 			}
 		} else if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE)) {
@@ -944,7 +947,7 @@ int folio_referenced(struct folio *folio, int is_locked,
 		rwc.invalid_vma = invalid_folio_referenced_vma;
 	}
 
-	rmap_walk(folio, &rwc);   ///遍历映射page的所有PTE，调用rmap_one()函数
+	rmap_walk(folio, &rwc);   ///遍历映射page的所有VMA，调用rmap_one()函数，判断是否有映射的pte,统计映射pte总数
 	*vm_flags = pra.vm_flags;
 
 	if (we_locked)
@@ -2460,7 +2463,8 @@ static void rmap_walk_anon(struct folio *folio,
 	pgoff_end = pgoff_start + folio_nr_pages(folio) - 1;
 	anon_vma_interval_tree_foreach(avc, &anon_vma->rb_root,
 			pgoff_start, pgoff_end) {
-		struct vm_area_struct *vma = avc->vma;   ///从avc获得va
+		///从avc获得va
+		struct vm_area_struct *vma = avc->vma;
 		unsigned long address = vma_address(&folio->page, vma);
 
 		VM_BUG_ON_VMA(address == -EFAULT, vma);

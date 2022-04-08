@@ -473,6 +473,16 @@ static void folio_inc_refs(struct folio *folio)
  * __SetPageReferenced(page) may be substituted for mark_page_accessed(page).
  */
 ///若页框被访问，被调用
+/*************************************************
+ * func:标记页面，若页框被访问，被调用
+ * 有三种情况：
+ * page在不活跃链表上：
+ *      unreferenced-->inactive,referenced
+ *      referenced  -->active,unreferenced
+ * page在活跃链表上：
+ *                  -->active,referenced
+ *************************************************/
+
 void folio_mark_accessed(struct folio *folio)
 {
 	if (lru_gen_enabled()) {
@@ -495,6 +505,10 @@ void folio_mark_accessed(struct folio *folio)
 		 * folio_batch, mark it active and it'll be moved to the active
 		 * LRU on the next drain.
 		 */
+		 ///页面被访问，但不是活跃，将访问位清零，加入到活跃链表
+		 ///加入到活跃链表：
+		 ///   如果page在当前在lru，先从原来lru删除，再加入也向量组，等待激活;
+		 ///   如果page在页向量组, 激活标志位，将来会加入活跃链表
 		if (folio_test_lru(folio))
 			folio_activate(folio);
 		else
