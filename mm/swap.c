@@ -346,9 +346,9 @@ static void folio_activate_fn(struct lruvec *lruvec, struct folio *folio)
 	if (!folio_test_active(folio) && !folio_test_unevictable(folio)) {
 		long nr_pages = folio_nr_pages(folio);
 
-		lruvec_del_folio(lruvec, folio);
+		lruvec_del_folio(lruvec, folio);   ///从不活跃链表删除掉
 		folio_set_active(folio);
-		lruvec_add_folio(lruvec, folio);
+		lruvec_add_folio(lruvec, folio);   ///添加到活跃链表
 		trace_mm_lru_activate(folio);
 
 		__count_vm_events(PGACTIVATE, nr_pages);
