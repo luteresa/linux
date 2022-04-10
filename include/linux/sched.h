@@ -82,6 +82,7 @@ struct task_group;
  */
 
 /* Used in tsk->state: */
+///代码里的运行态,就绪态或正在运行,都用running
 #define TASK_RUNNING			0x00000000
 #define TASK_INTERRUPTIBLE		0x00000001
 #define TASK_UNINTERRUPTIBLE		0x00000002
@@ -740,6 +741,8 @@ struct task_struct {
 	 * For reasons of header soup (see current_thread_info()), this
 	 * must be the first element of task_struct.
 	 */
+	 ///Linux5.0中thread_info从内核栈移到了task_struct
+	 ///ARM64的SP_EL0用来存放当前进程的task_struct地址
 	struct thread_info		thread_info;
 #endif
 	unsigned int			__state;

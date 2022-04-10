@@ -361,7 +361,7 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 
 	if (likely(!args->fn)) {
 		*childregs = *current_pt_regs();
-		childregs->regs[0] = 0;
+		childregs->regs[0] = 0;  ///子进程返回值
 
 		/*
 		 * Read the current TLS pointer from tpidr_el0 as it may be
@@ -400,7 +400,9 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 		p->thread.cpu_context.x19 = (unsigned long)args->fn;
 		p->thread.cpu_context.x20 = (unsigned long)args->fn_arg;
 	}
-	p->thread.cpu_context.pc = (unsigned long)ret_from_fork;
+	///子进程第一次执行，会跳转到ret_from_fork汇编
+	///如果子进程是用户进程，跳转到ret_to_user汇编函数
+	p->thread.cpu_context.pc = (unsigned long)ret_from_fork;  
 	p->thread.cpu_context.sp = (unsigned long)childregs;
 	/*
 	 * For the benefit of the unwinder, set up childregs->stackframe
