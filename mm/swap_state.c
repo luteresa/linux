@@ -171,6 +171,7 @@ void __delete_from_swap_cache(struct folio *folio,
  * Context: Caller needs to hold the folio lock.
  * Return: Whether the folio was added to the swap cache.
  */
+ //为页面分配交换分区
 bool add_to_swap(struct folio *folio)
 {
 	swp_entry_t entry;
@@ -213,6 +214,7 @@ bool add_to_swap(struct folio *folio)
 	 * the folio is swapped in later. Always setting the dirty flag
 	 * for the folio solves the problem.
 	 */
+	//设置页面脏
 	folio_mark_dirty(folio);
 
 	return true;

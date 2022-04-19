@@ -1673,6 +1673,7 @@ retry:
 
 		cond_resched();
 
+		///从lru末尾获取页面
 		folio = lru_to_folio(folio_list);
 		list_del(&folio->lru);
 
@@ -1852,8 +1853,14 @@ retry:
 								folio_list))
 						goto activate_locked;
 				}
+<<<<<<< HEAD
 				if (!add_to_swap(folio)) {
 					if (!folio_test_large(folio))
+=======
+				///第一次扫描，将不活跃链表尾部匿名页放入交换分区
+				if (!add_to_swap(page)) {
+					if (!PageTransHuge(page))
+>>>>>>> f544205b2eb9 (comments for anon page)
 						goto activate_locked_split;
 					/* Fallback to swap normal pages */
 					if (split_folio_to_list(folio,
@@ -1894,8 +1901,14 @@ retry:
 			if (folio_test_pmd_mappable(folio))
 				flags |= TTU_SPLIT_HUGE_PMD;
 
+<<<<<<< HEAD
 			try_to_unmap(folio, flags);
 			if (folio_mapped(folio)) {
+=======
+			///通过RMAP去寻找所有索引映射的VMA和PTE，并解除映射,5.15?
+			try_to_unmap(page, flags);
+			if (page_mapped(page)) {
+>>>>>>> f544205b2eb9 (comments for anon page)
 				stat->nr_unmap_fail += nr_pages;
 				if (!was_swapbacked &&
 				    folio_test_swapbacked(folio))
@@ -1947,7 +1960,13 @@ retry:
 			 * starts and then write it out here.
 			 */
 			try_to_unmap_flush_dirty();
+<<<<<<< HEAD
 			switch (pageout(folio, mapping, &plug)) {
+=======
+
+			///pageout,将页面写回swap分区
+			switch (pageout(page, mapping)) {
+>>>>>>> f544205b2eb9 (comments for anon page)
 			case PAGE_KEEP:
 				goto keep_locked;
 			case PAGE_ACTIVATE:
@@ -2461,9 +2480,16 @@ static int current_may_throttle(void)
  * shrink_inactive_list() is a helper for shrink_node().  It returns the number
  * of reclaimed pages
  */
+<<<<<<< HEAD
 static unsigned long shrink_inactive_list(unsigned long nr_to_scan,
 		struct lruvec *lruvec, struct scan_control *sc,
 		enum lru_list lru)
+=======
+ ///扫描不活跃链表
+static unsigned long
+shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
+		     struct scan_control *sc, enum lru_list lru)
+>>>>>>> f544205b2eb9 (comments for anon page)
 {
 	LIST_HEAD(folio_list);
 	unsigned long nr_scanned;
@@ -2581,6 +2607,7 @@ static unsigned long shrink_inactive_list(unsigned long nr_to_scan,
  * The downside is that we have to touch folio->_refcount against each folio.
  * But we had to alter folio->flags anyway.
  */
+//把匿名页，从活跃链表尾部移到不活跃链表头部
 static void shrink_active_list(unsigned long nr_to_scan,
 			       struct lruvec *lruvec,
 			       struct scan_control *sc,
