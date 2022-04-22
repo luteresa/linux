@@ -570,7 +570,7 @@ struct sched_entity {
 
 	u64				exec_start;
 	u64				sum_exec_runtime;
-	u64				vruntime;
+	u64				vruntime;               ///虚拟运行时间，加权后的时间，单位ns，与定时器节拍无关
 	u64				prev_sum_exec_runtime;
 
 	u64				nr_migrations;
@@ -804,6 +804,7 @@ struct task_struct {
 	int				normal_prio;
 	unsigned int			rt_priority;
 
+///进程调度实体
 	struct sched_entity		se;
 	struct sched_rt_entity		rt;
 	struct sched_dl_entity		dl;
