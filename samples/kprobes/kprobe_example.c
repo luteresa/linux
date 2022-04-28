@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <linux/kprobes.h>
 
+///探测函数名
 static char symbol[KSYM_NAME_LEN] = "kernel_clone";
 module_param_string(symbol, symbol, KSYM_NAME_LEN, 0644);
 
@@ -25,6 +26,7 @@ static struct kprobe kp = {
 };
 
 /* kprobe pre_handler: called just before the probed instruction is executed */
+///探测点前执行函数
 static int __kprobes handler_pre(struct kprobe *p, struct pt_regs *regs)
 {
 #ifdef CONFIG_X86
@@ -97,9 +99,12 @@ static void __kprobes handler_post(struct kprobe *p, struct pt_regs *regs,
 static int __init kprobe_init(void)
 {
 	int ret;
+
+	///初始化探测函数
 	kp.pre_handler = handler_pre;
 	kp.post_handler = handler_post;
 
+	//向内核kprobe子系统注册一个探测点
 	ret = register_kprobe(&kp);
 	if (ret < 0) {
 		pr_err("register_kprobe failed, returned %d\n", ret);
@@ -111,6 +116,7 @@ static int __init kprobe_init(void)
 
 static void __exit kprobe_exit(void)
 {
+	///卸载探测点
 	unregister_kprobe(&kp);
 	pr_info("kprobe at %p unregistered\n", kp.addr);
 }
