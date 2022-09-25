@@ -254,17 +254,23 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 	thread->cpu_domain = get_domain();
 #endif
 
+	///处理子进程是用户进程的情况
 	if (likely(!args->fn)) {
 		*childregs = *current_pt_regs();
 		childregs->ARM_r0 = 0;
 		if (stack_start)
 			childregs->ARM_sp = stack_start;
 	} else {
+		//子进程是内核线程
 		memset(childregs, 0, sizeof(struct pt_regs));
 		thread->cpu_context.r4 = (unsigned long)args->fn_arg;
 		thread->cpu_context.r5 = (unsigned long)args->fn;
 		childregs->ARM_cpsr = SVC_MODE;
 	}
+	/*
+	 * 设置子进程的硬件上下文成员pc,sp
+	 * 子进程第一次返回，会跳转到ret_from_fork
+	 */
 	thread->cpu_context.pc = (unsigned long)ret_from_fork;
 	thread->cpu_context.sp = (unsigned long)childregs;
 
