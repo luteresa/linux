@@ -1124,6 +1124,7 @@ static int __send_signal_locked(int sig, struct kernel_siginfo *info,
 	q = __sigqueue_alloc(sig, t, GFP_ATOMIC, override_rlimit, 0);
 
 	if (q) {
+		///q加入task_struct->pending->list
 		list_add_tail(&q->list, &pending->list);
 		switch ((unsigned long) info) {
 		case (unsigned long) SEND_SIG_NOINFO:
