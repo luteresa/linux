@@ -1097,6 +1097,11 @@ u64 __init dt_mem_next_cell(int s, const __be32 **cellp)
 /*
  * early_init_dt_scan_memory - Look for and parse memory nodes
  */
+///choosen node，该节点保存bootargs属性
+//memory node，定义系统的物理内存布局，
+//DTBheader 的memreserve域，
+//reserved-memorynode, 定义系统保留的内存地址区域。
+
 int __init early_init_dt_scan_memory(void)
 {
 	int node;
@@ -1293,10 +1298,16 @@ void __init early_init_dt_scan_nodes(void)
 	early_init_dt_scan_root();
 
 	/* Retrieve various information from the /chosen node */
+	/*
+	 * 扫描chosen节点，把bootargs值拷贝到boot_command_line中，
+	 * 如果定义了CONFIG_CMDLINE宏，把命令行参数拷贝到boot_command_line
+	 * */
+
 	rc = early_init_dt_scan_chosen(boot_command_line);
 	if (rc)
 		pr_warn("No chosen node found, continuing without\n");
 
+	///对dtb中的memory node进行解析
 	/* Setup memory, calling early_init_dt_add_memory_arch */
 	early_init_dt_scan_memory();
 
@@ -1308,6 +1319,7 @@ bool __init early_init_dt_scan(void *params)
 {
 	bool status;
 
+	//对dtb头进行检查
 	status = early_init_dt_verify(params);
 	if (!status)
 		return false;

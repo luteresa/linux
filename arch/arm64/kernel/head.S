@@ -399,6 +399,17 @@ SYM_FUNC_START_LOCAL(create_idmap)
 	adrp	x6, _end + MAX_FDT_SIZE + SWAPPER_BLOCK_SIZE
 	mov	x7, SWAPPER_RX_MMUFLAGS
 
+///调用map_memory宏建立__idmap_text代码段的映射页表；
+/*
+ * x0：idmap_pg_dir
+ * x1：
+ * x3：__idmap_text_start
+ * x6： __idmap_text_end
+ * x7： SWAPPER_MM_MMUFLAGS
+ * x3： __idmap_text_start
+ * x4： PTRS_PER_PGD
+*/
+
 	map_memory x0, x1, x3, x6, x7, x3, IDMAP_PGD_ORDER, x10, x11, x12, x13, x14, EXTRA_SHIFT
 
 	/* Remap the kernel page tables r/w in the ID map */
@@ -409,6 +420,21 @@ SYM_FUNC_START_LOCAL(create_idmap)
 	mov	x5, SWAPPER_RW_MMUFLAGS
 	mov	x6, #SWAPPER_BLOCK_SHIFT
 	bl	remap_region
+
+	///调用map_memory宏建立整个内核镜像代码段的映射页表；
+	/**************************************************************************
+	 * 为什么要建第二张表？
+	 * CPU刚启动时，物理内存一般都在低地址(不会超过256T大小)，恒等映射的地址实际在用户空间了，
+	 * 即MMU启用后idmap_pg_dir会调入TTBR0;
+     * 而内核空间的链接地址都是在高地址(内核空间在高地址)，需要填入TTBR1；
+     * 因此，这里再建一张表，映射整个内核镜像，且虚拟地址空间实在高地址区0xffffxxxx xxxx xxxx
+
+     * 注：init_pg_dir和idmap_pg_dir两个页表映射区别：
+     * (1)init_pg_dir映射的虚拟地址在高位0xffff xxxx xxxx xxxx;
+     *   idmap_pg_dir映射的虚拟地址在地位0x0000 xxxx xxxx xxxx;
+     *   MMU启用后，init_pg_dir填入TTBR1,idmap_pg_dir填入TTBR0；
+     * (2)init_pg_dir映射大小是整个内核镜像，idmap_pg_dir映射2M, 只需要过度完成MMU开启即可；
+     ***************************************************************************/
 
 	/* Remap the FDT after the kernel image */
 	adrp	x1, _text
@@ -485,6 +511,8 @@ SYM_FUNC_END(create_kernel_mapping)
  *   x0 = __pa(KERNEL_START)
  */
 SYM_FUNC_START_LOCAL(__primary_switched)
+	///已开启mmu，这里开始访问的都是虚拟地址,
+	///比如init_task静态定义的虚拟地址，已经映射到对应物理内存地址
 	adr_l	x4, init_task           ///init_thread_union指向thread_union数据结构，其中包含系统第一个进程(init进程)的内核栈
 
 	init_cpu_task x4, x5, x6
