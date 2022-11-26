@@ -210,6 +210,7 @@ static phys_addr_t __init max_zone_phys(unsigned int zone_bits)
 	return min(zone_mask, memblock_end_of_DRAM() - 1) + 1;
 }
 
+///计算每种类型zone的最大页帧号，然后初始化每个node中所有类型的zone
 static void __init zone_sizes_init(void)
 {
 	unsigned long max_zone_pfns[MAX_NR_ZONES]  = {0};
@@ -221,6 +222,7 @@ static void __init zone_sizes_init(void)
 	acpi_zone_dma_bits = fls64(acpi_iort_dma_get_max_cpu_address());
 	dt_zone_dma_bits = fls64(of_dma_get_max_cpu_address(NULL));
 	zone_dma_bits = min3(32U, dt_zone_dma_bits, acpi_zone_dma_bits);
+	///计算zone区域大小,这里默认是全部dram大小
 	arm64_dma_phys_limit = max_zone_phys(zone_dma_bits);
 	max_zone_pfns[ZONE_DMA] = PFN_DOWN(arm64_dma_phys_limit);
 #endif
@@ -231,6 +233,7 @@ static void __init zone_sizes_init(void)
 #endif
 	max_zone_pfns[ZONE_NORMAL] = max_pfn;
 
+	///根据每个zone最大页帧号，初始化zone结构
 	free_area_init(max_zone_pfns);
 }
 
@@ -442,6 +445,7 @@ void __init bootmem_init(void)
 	 */
 	///sparse内存模型初始化；
 	sparse_init();
+	///初始化zone数据结构
 	zone_sizes_init();
 
 	/*
