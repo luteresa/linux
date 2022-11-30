@@ -2597,6 +2597,8 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
  *
  * The other migratetypes do not have fallbacks.
  */
+///伙伴系统分配连续内存时，当指定迁移类型所对应的链表中没有空闲内存时，
+///内核将会按照静态定义的顺序，从其他迁移类型链表中寻找
 static int fallbacks[MIGRATE_TYPES][3] = {
 	[MIGRATE_UNMOVABLE]   = { MIGRATE_RECLAIMABLE, MIGRATE_MOVABLE,   MIGRATE_TYPES },
 	[MIGRATE_MOVABLE]     = { MIGRATE_RECLAIMABLE, MIGRATE_UNMOVABLE, MIGRATE_TYPES },
@@ -7915,6 +7917,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 
 		set_pageblock_order();
 		setup_usemap(zone);
+		///初始化free_area域
 		init_currently_empty_zone(zone, zone->zone_start_pfn, size);
 	}
 }
@@ -8363,6 +8366,7 @@ bool __weak arch_has_descending_max_zone_pfns(void)
  * starts where the previous one ended. For example, ZONE_DMA32 starts
  * at arch_max_dma_pfn.
  */
+///计算每个zone能管理的页面数
 void __init free_area_init(unsigned long *max_zone_pfn)
 {
 	unsigned long start_pfn, end_pfn;
@@ -8469,6 +8473,7 @@ void __init free_area_init(unsigned long *max_zone_pfn)
 		}
 
 		pgdat = NODE_DATA(nid);
+		///初始化nid节点
 		free_area_init_node(nid);
 
 		/* Any memory on that node */
@@ -8477,6 +8482,7 @@ void __init free_area_init(unsigned long *max_zone_pfn)
 		check_for_memory(pgdat, nid);
 	}
 
+	///初始化struct page
 	memmap_init();
 }
 
