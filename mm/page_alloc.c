@@ -4552,6 +4552,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	unsigned long pflags;
 	unsigned int noreclaim_flag;
 
+	///如果申请一个内存页，那没必要内存规整，是因为内存不足，而不是碎片导致分配失败
 	if (!order)
 		return NULL;
 
@@ -4559,6 +4560,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	delayacct_compact_start();
 	noreclaim_flag = memalloc_noreclaim_save();
 
+	///开始内存碎片整理
 	*compact_result = try_to_compact_pages(gfp_mask, order, alloc_flags, ac,
 								prio, &page);
 
@@ -4578,6 +4580,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	if (page)
 		prep_new_page(page, order, gfp_mask, alloc_flags);
 
+	///整理完成后，继续尝试申请内存块
 	/* Try get a page from the freelist if available */
 	if (!page)
 		page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac);
@@ -5082,6 +5085,9 @@ check_retry_cpuset(int cpuset_mems_cookie, struct alloc_context *ac)
 	return false;
 }
 
+/*
+ * 直接分配内存块失败，进入慢速路径
+ * */
 static inline struct page *
 __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 						struct alloc_context *ac)
@@ -5145,6 +5151,7 @@ restart:
 			goto nopage;
 	}
 
+	///唤醒kswapd内核线程，回收页面
 	if (alloc_flags & ALLOC_KSWAPD)
 		wake_all_kswapds(order, gfp_mask, ac);
 
@@ -5152,6 +5159,7 @@ restart:
 	 * The adjusted alloc_flags might result in immediate success, so try
 	 * that first
 	 */
+	///kswapd回收后，再次尝试直接内存分配
 	page = get_page_from_freelist(gfp_mask, order, alloc_flags, ac);
 	if (page)
 		goto got_pg;
@@ -5169,6 +5177,7 @@ restart:
 			(costly_order ||
 			   (order > 0 && ac->migratetype != MIGRATE_MOVABLE))
 			&& !gfp_pfmemalloc_allowed(gfp_mask)) {
+		///进行页面规整
 		page = __alloc_pages_direct_compact(gfp_mask, order,
 						alloc_flags, ac,
 						INIT_COMPACT_PRIORITY,
@@ -5245,12 +5254,14 @@ retry:
 	if (current->flags & PF_MEMALLOC)
 		goto nopage;
 
+	///触发直接内存回收
 	/* Try direct reclaim and then allocating */
 	page = __alloc_pages_direct_reclaim(gfp_mask, order, alloc_flags, ac,
 							&did_some_progress);
 	if (page)
 		goto got_pg;
 
+	///再次尝试页面规整，然后重新分配内存
 	/* Try direct compaction and then allocating */
 	page = __alloc_pages_direct_compact(gfp_mask, order, alloc_flags, ac,
 					compact_priority, &compact_result);
@@ -5293,6 +5304,7 @@ retry:
 	    check_retry_zonelist(zonelist_iter_cookie))
 		goto restart;
 
+	///回收，页面规整都失败，尝试启动oom
 	/* Reclaim has failed us, start killing things */
 	page = __alloc_pages_may_oom(gfp_mask, order, ac, &did_some_progress);
 	if (page)

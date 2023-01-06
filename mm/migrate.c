@@ -1169,6 +1169,7 @@ out:
  * Obtain the lock on page, remove all ptes and migrate the page
  * to the newly allocated page in newpage.
  */
+///umap_and_move()将可迁移页面，迁移到空闲内存页中
 static int unmap_and_move(new_page_t get_new_page,
 				   free_page_t put_new_page,
 				   unsigned long private, struct page *page,
@@ -1459,6 +1460,7 @@ thp_subpage_migration:
 		thp_retry = 0;
 		nr_retry_pages = 0;
 
+		///遍历可迁移页面链表
 		list_for_each_entry_safe(page, page2, from, lru) {
 			/*
 			 * THP statistics is based on the source huge page.
@@ -1475,6 +1477,7 @@ thp_subpage_migration:
 						pass > 2, mode, reason,
 						&ret_pages);
 			else
+			///umap_and_move()将可迁移页面，迁移到空闲内存页中
 				rc = unmap_and_move(get_new_page, put_new_page,
 						private, page, pass > 2, mode,
 						reason, &ret_pages);
