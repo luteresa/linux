@@ -514,6 +514,7 @@ int walk_page_range_novma(struct mm_struct *mm, unsigned long start,
 
 	mmap_assert_write_locked(walk.mm);
 
+	pr_info("---at walk_page_range_novmaw\n");
 	return walk_pgd_range(start, end, &walk);
 }
 
