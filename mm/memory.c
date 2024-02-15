@@ -4560,6 +4560,7 @@ static inline bool should_fault_around(struct vm_fault *vmf)
 	return fault_around_bytes >> PAGE_SHIFT > 1;
 }
 
+///读文件页，缺页异常, pte不存在
 static vm_fault_t do_read_fault(struct vm_fault *vmf)
 {
 	vm_fault_t ret = 0;
@@ -4569,6 +4570,9 @@ static vm_fault_t do_read_fault(struct vm_fault *vmf)
 	 * if page by the offset is not ready to be mapped (cold cache or
 	 * something).
 	 */
+///如果定义了map_pages，将异常地址附近的页尽可能多的与高速缓存建立映射(只针对现存的页面缓存，不创建页面!)	
+///预估异常地址附近页面高速缓存，可能很快会被读到
+/////fault_around_bytes默认16页
 	if (should_fault_around(vmf)) {
 		ret = do_fault_around(vmf);
 		if (ret)
@@ -4710,7 +4714,7 @@ static vm_fault_t do_fault(struct vm_fault *vmf)
 	else if (!(vma->vm_flags & VM_SHARED))
 		ret = do_cow_fault(vmf);            ///写内存引起，且为私有
 	else
-		ret = do_shared_fault(vmf);         ///内存引起，且为共享
+		ret = do_shared_fault(vmf);         ///写内存引起，且为共享
 
 	/* preallocated pagetable is unused: free it */
 	if (vmf->prealloc_pte) {                ///释放prealloc_pte
@@ -5213,6 +5217,7 @@ static void lru_gen_exit_fault(void)
  * The mmap_lock may have been released depending on flags and our
  * return value.  See filemap_fault() and __folio_lock_or_retry().
  */
+ ///进程地址空间却也异常核心函数，平台无关部分
 vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 			   unsigned int flags, struct pt_regs *regs)
 {
@@ -5243,7 +5248,7 @@ vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 	if (unlikely(is_vm_hugetlb_page(vma)))
 		ret = hugetlb_fault(vma->vm_mm, vma, address, flags);
 	else
-		ret = __handle_mm_fault(vma, address, flags);
+		ret = __handle_mm_fault(vma, address, flags);  ///缺页异常核心处理函数
 
 	lru_gen_exit_fault();
 
