@@ -1476,10 +1476,10 @@ static enum folio_references folio_check_references(struct folio *folio,
 	int referenced_ptes, referenced_folio;
 	unsigned long vm_flags;
 
-	///检查页面，引用了多少个PTE(referenced_ptes)
+	///检查页面，引用了多少个PTE(referenced_ptes),是否有访问
 	referenced_ptes = folio_referenced(folio, 1, sc->target_mem_cgroup,
 					   &vm_flags);
-	///返回PG_referenced的值，并清除PG_referenced标记
+	///返回PG_referenced的值(只跟是否访问有关，与历史值无关)，并清除PG_referenced标记
 	referenced_folio = folio_test_clear_referenced(folio);
 
 	/*
@@ -1512,14 +1512,15 @@ static enum folio_references folio_check_references(struct folio *folio,
 		 */
 		folio_set_referenced(folio);
 
-	    ///referenced_ptes多个vma映射，放入活跃链表
+		///referenced_page > 0， 访问过，放入活跃链表
+		///referenced_ptes>1, 多个vma映射，放入活跃链表
 		if (referenced_folio || referenced_ptes > 1)
 			return FOLIOREF_ACTIVATE;
 
 		/*
 		 * Activate file-backed executable folios after first usage.
 		 */
-		 ///映射可执行文件，放入活跃链表
+		 ///映射可执行文件,或匿名页面，放入活跃链表
 		if ((vm_flags & VM_EXEC) && folio_is_file_lru(folio))
 			return FOLIOREF_ACTIVATE;
 
@@ -1665,7 +1666,7 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
 		struct pglist_data *pgdat, struct scan_control *sc,
 		struct reclaim_stat *stat, bool ignore_references)
 {
-///定义两个临时链表
+///定义临时链表
 	LIST_HEAD(ret_folios);
 	LIST_HEAD(free_folios);
 	LIST_HEAD(demote_folios);
@@ -1693,6 +1694,7 @@ retry:
 		folio = lru_to_folio(folio_list);
 		list_del(&folio->lru);
 
+		///尝试获取页面锁，若不成功，页面保留在不活跃lru
 		if (!folio_trylock(folio))
 			goto keep;
 
@@ -1703,10 +1705,11 @@ retry:
 		/* Account the number of base pages */
 		sc->nr_scanned += nr_pages;
 
+		///不可回收页面
 		if (unlikely(!folio_evictable(folio)))
 			goto activate_locked;
 
-		///判断是否允许回收
+		///判断是否允许回收,映射页面
 		if (!sc->may_unmap && folio_mapped(folio))
 			goto keep_locked;
 
@@ -1788,6 +1791,7 @@ retry:
 			    folio_test_reclaim(folio) &&
 			    test_bit(PGDAT_WRITEBACK, &pgdat->flags)) {
 				stat->nr_immediate += nr_pages;
+				///跳转，继续扫描其他页
 				goto activate_locked;
 
 			/* Case 2 above */
@@ -1942,7 +1946,11 @@ retry:
 			 * the same dirty folios again (with the reclaim
 			 * flag set).
 			 */
-			 ///如果是文件映射页面，扫描一轮完成后，发现好多脏页缓存还没加到回写子系统，设置PGDAT_DIRTY,否则kswapd不回为少量脏页回写缓存
+			 ///如果匿名页，都会调用pageout
+			 ///如果是文件映射页面，扫描一轮完成后，发现好多脏页缓存还没加到回写子系统，
+			 ///kswapd:调用pageout函数回写脏页；
+			 ///直接回收：只有发现大量脏页，即设置PGDAT_DIRTY,才会调用pageout
+
 			if (folio_is_file_lru(folio) &&
 			    (!current_is_kswapd() ||
 			     !folio_test_reclaim(folio) ||
@@ -2503,6 +2511,7 @@ static unsigned long shrink_inactive_list(unsigned long nr_to_scan,
 		struct lruvec *lruvec, struct scan_control *sc,
 		enum lru_list lru)
 {
+	///定义临时链表
 	LIST_HEAD(folio_list);
 	unsigned long nr_scanned;
 	unsigned int nr_reclaimed = 0;
@@ -2518,7 +2527,7 @@ static unsigned long shrink_inactive_list(unsigned long nr_to_scan,
 			return 0;
 
 		/* wait a bit for the reclaimer. */
-		///太多进程在直接回收页面，睡眠，避免内存抖动?
+		///太多进程在直接回收页面，睡眠，避免内存抖动,甚至触发OOM Killer
 		stalled = true;
 		reclaim_throttle(pgdat, VMSCAN_THROTTLE_ISOLATED);
 
@@ -3000,6 +3009,7 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	unsigned long ap, fp;
 	enum lru_list lru;
 
+	///如果没有交换分区，不用扫描匿名页
 	/* If we have no swap space, do not bother scanning anon folios. */
 	if (!sc->may_swap || !can_reclaim_anon_pages(memcg, pgdat->node_id, sc)) {
 		scan_balance = SCAN_FILE;
@@ -3031,6 +3041,7 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	/*
 	 * If the system is almost out of file pages, force-scan anon.
 	 */
+	 ///内存几乎耗光
 	if (sc->file_is_tiny) {
 		scan_balance = SCAN_ANON;
 		goto out;
@@ -3040,6 +3051,7 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	 * If there is enough inactive page cache, we do not reclaim
 	 * anything from the anonymous working right now.
 	 */
+	 ///如果inactive file页足够
 	if (sc->cache_trim_mode) {
 		scan_balance = SCAN_FILE;
 		goto out;
@@ -6079,6 +6091,7 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
 		nr[lru] -= min(nr[lru], nr_scanned);
 	}
 	blk_finish_plug(&plug);
+	///已经回收页面个数
 	sc->nr_reclaimed += nr_reclaimed;
 
 	/*
@@ -6243,7 +6256,7 @@ again:
 
 	prepare_scan_count(pgdat, sc);
 
-	///执行回收页面
+	///执行memory cgoup页面回收
 	shrink_node_memcgs(pgdat, sc);
 
 	if (reclaim_state) {
@@ -6260,6 +6273,7 @@ again:
 	if (sc->nr_reclaimed - nr_reclaimed)
 		reclaimable = true;
 
+	///不止kswapd现存调用该函数
 	if (current_is_kswapd()) {
 		/*
 		 * If reclaim is isolating dirty pages under writeback,
@@ -7475,7 +7489,9 @@ static int kswapd(void *p)
 	 * us from recursively trying to free more memory as we're
 	 * trying to free the first piece of memory in the first place).
 	 */
-	 ///PF_MEMALLOC允许使用系统预留内存，即不考虑水位
+	 ///PF_MEMALLOC:允许使用系统预留内存，即不考虑水位
+	 ///PF_SWAPWRITE:允许写交换分区
+	 ///PF_KSWAPD:标志kswapd内核现存
 	tsk->flags |= PF_MEMALLOC | PF_KSWAPD;
 	set_freezable();
 

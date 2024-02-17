@@ -375,6 +375,8 @@ void folio_activate(struct folio *folio)
 		folio_get(folio);
 		local_lock(&cpu_fbatches.lock);
 		fbatch = this_cpu_ptr(&cpu_fbatches.activate);
+///加入页向量组
+///从不活跃链表移除
 		folio_batch_add_and_move(fbatch, folio, folio_activate_fn);
 		local_unlock(&cpu_fbatches.lock);
 	}
@@ -505,14 +507,17 @@ void folio_mark_accessed(struct folio *folio)
 		 * folio_batch, mark it active and it'll be moved to the active
 		 * LRU on the next drain.
 		 */
-		 ///页面被访问，但不是活跃，将访问位清零，加入到活跃链表
+		 ///页面被访问,且referenced不为0，但不是活跃，将访问位清零，加入到活跃链表
+
 		 ///加入到活跃链表：
-		 ///   如果page在当前在lru，先从原来lru删除，再加入也向量组，等待激活;
+		 ///   如果page在当前在lru(inactive)，先从原来lru删除，再加入也向量组，等待激活;
 		 ///   如果page在页向量组, 激活标志位，将来会加入活跃链表
 		if (folio_test_lru(folio))
 			folio_activate(folio);
 		else
+///设置活跃标记
 			__lru_cache_activate_folio(folio);
+///清除referenced=0
 		folio_clear_referenced(folio);
 		workingset_activation(folio);
 	}
