@@ -1962,6 +1962,7 @@ no_page:
 			gfp |= GFP_NOWAIT | __GFP_NOWARN;
 		}
 
+		///分配一个page，并读入文件内容, 用于pagecache
 		folio = filemap_alloc_folio(gfp, 0);
 		if (!folio)
 			return NULL;
@@ -1973,6 +1974,7 @@ no_page:
 		if (fgp_flags & FGP_ACCESSED)
 			__folio_set_referenced(folio);
 
+		///page加入lru链表
 		err = filemap_add_folio(mapping, folio, index, gfp);
 		if (unlikely(err)) {
 			folio_put(folio);
@@ -3115,6 +3117,7 @@ vm_fault_t filemap_fault(struct vm_fault *vmf)
 	/*
 	 * Do we have something in the page cache already?
 	 */
+	 ///如果pagecache已经存在，直接获取
 	folio = filemap_get_folio(mapping, index);
 	if (likely(folio)) {
 		/*
@@ -3122,6 +3125,7 @@ vm_fault_t filemap_fault(struct vm_fault *vmf)
 		 * the lock.
 		 */
 		if (!(vmf->flags & FAULT_FLAG_TRIED))
+			///直接读到pagecache
 			fpin = do_async_mmap_readahead(vmf, folio);
 		if (unlikely(!folio_test_uptodate(folio))) {
 			filemap_invalidate_lock_shared(mapping);
@@ -3142,6 +3146,7 @@ retry_find:
 			filemap_invalidate_lock_shared(mapping);
 			mapping_locked = true;
 		}
+		///pagecache不存在，分配一个
 		folio = __filemap_get_folio(mapping, index,
 					  FGP_CREAT|FGP_FOR_MMAP,
 					  vmf->gfp_mask);
@@ -3217,6 +3222,7 @@ page_not_uptodate:
 	 * and we need to check for errors.
 	 */
 	fpin = maybe_unlock_mmap_for_io(vmf, fpin);
+	///读文件内容到pagecache
 	error = filemap_read_folio(file, mapping->a_ops->read_folio, folio);
 	if (fpin)
 		goto out_retry;

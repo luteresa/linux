@@ -4224,7 +4224,8 @@ static vm_fault_t __do_fault(struct vm_fault *vmf)
 			return VM_FAULT_OOM;
 	}
 
-	ret = vma->vm_ops->fault(vmf);  ///读文件内容到vmf->page中
+///读文件内容到pagecache中, vma操作函数，比如ext4:filemap_fault
+	ret = vma->vm_ops->fault(vmf);  
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY |
 			    VM_FAULT_DONE_COW)))
 		return ret;

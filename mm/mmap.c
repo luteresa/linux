@@ -480,6 +480,7 @@ static int vma_link(struct mm_struct *mm, struct vm_area_struct *vma)
 		i_mmap_lock_write(mapping);
 	}
 
+	///vma添加到inode红黑树
 	vma_mas_store(vma, &mas);
 
 	if (mapping) {

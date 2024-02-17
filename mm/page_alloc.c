@@ -6580,6 +6580,7 @@ static void build_zonelists(pg_data_t *pgdat)
 		prev_node = node;
 	}
 
+printk("--- init nr_nodes:%d\n", nr_nodes);
 	build_zonelists_in_node_order(pgdat, node_order, nr_nodes);
 	build_thisnode_zonelists(pgdat);
 	pr_info("Fallback order for Node %d: ", local_node);
@@ -7887,6 +7888,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 		size = zone->spanned_pages;
 		freesize = zone->present_pages;
 
+		pr_debug("---j=%d, size=%lu,freesize=%lu\n",j, size, freesize);
 		/*
 		 * Adjust freesize so that it accounts for how much memory
 		 * is used by this zone for memmap. This affects the watermark

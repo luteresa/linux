@@ -2547,8 +2547,10 @@ static void rmap_walk_file(struct folio *folio,
 		i_mmap_lock_read(mapping);
 	}
 lookup:
+	///遍历page映射的所有vma
 	vma_interval_tree_foreach(vma, &mapping->i_mmap,
 			pgoff_start, pgoff_end) {
+		///找到vma，计算相应地址
 		unsigned long address = vma_address(&folio->page, vma);
 
 		VM_BUG_ON_VMA(address == -EFAULT, vma);
@@ -2557,6 +2559,7 @@ lookup:
 		if (rwc->invalid_vma && rwc->invalid_vma(vma, rwc->arg))
 			continue;
 
+		///解除page映射
 		if (!rwc->rmap_one(folio, vma, address, rwc->arg))
 			goto done;
 		if (rwc->done && rwc->done(folio))
