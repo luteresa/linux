@@ -341,6 +341,7 @@ const struct sched_class fair_sched_class;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 
+///遍历组内所有se
 /* Walk up scheduling entities hierarchy */
 #define for_each_sched_entity(se) \
 		for (; se; se = se->parent)
@@ -709,6 +710,8 @@ static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
  *
  * p = (nr <= nl) ? l : l*nr/nl
  */
+ ///cfs就绪队列中，当前可运行进程个数大于8时，为进程个数乘以最小延迟*0.75ms
+ ///否则默认延迟6ms
 static u64 __sched_period(unsigned long nr_running)
 {
 	if (unlikely(nr_running > sched_nr_latency))
@@ -745,7 +748,7 @@ static u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se)
 		qcfs_rq = cfs_rq_of(se);
 		load = &qcfs_rq->load;
 
-		///如果没有加入就绪队列，更新cfs_rq->load
+		///如果没有加入就绪队列，更新cfs_rq->load,即cfs_rq总权重
 		if (unlikely(!se->on_rq)) {
 			lw = qcfs_rq->load;
 
@@ -4520,7 +4523,7 @@ static void check_spread(struct cfs_rq *cfs_rq, struct sched_entity *se)
 #endif
 }
 
-///对虚拟时间进行惩罚
+///对虚拟时间进行惩罚/补偿
 static void
 place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 {
@@ -4773,8 +4776,10 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 	struct sched_entity *se;
 	s64 delta;
 
-	ideal_runtime = sched_slice(cfs_rq, curr);///理论运行时间
-	delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime; ///实际运行时间
+	///理论运行时间
+	ideal_runtime = sched_slice(cfs_rq, curr);
+	///实际运行时间
+	delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
 
 	///实际运行时间>理论运行时间，时间片用完，需要调度
 	if (delta_exec > ideal_runtime) {
@@ -4797,7 +4802,7 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 		return;
 
 	se = __pick_first_entity(cfs_rq);
-	///虚拟时间和红黑树最左树时间比较
+	///虚拟时间和红黑树最左树时间比较,仍然最小，不调度
 	delta = curr->vruntime - se->vruntime;
 
 	if (delta < 0)
@@ -4964,7 +4969,8 @@ entity_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr, int queued)
 #endif
 
 	if (cfs_rq->nr_running > 1)
-		check_preempt_tick(cfs_rq, curr); ///检查当前是否需要调度
+		///检查当前是否需要调度
+		check_preempt_tick(cfs_rq, curr); 
 }
 
 
@@ -5960,6 +5966,7 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		if (se->on_rq)
 			break;
 		cfs_rq = cfs_rq_of(se);
+		///se加入cfs_rq
 		enqueue_entity(cfs_rq, se, flags);
 
 		cfs_rq->h_nr_running++;
@@ -11610,7 +11617,8 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 	///如果开启组机制，还需要调度上一级调度实体；
 	for_each_sched_entity(se) {
 		cfs_rq = cfs_rq_of(se);
-		entity_tick(cfs_rq, se, queued);  ///检查是否需要调度
+        ///检查是否需要调度
+		entity_tick(cfs_rq, se, queued);
 	}
 
 	if (static_branch_unlikely(&sched_numa_balancing))
@@ -11658,6 +11666,7 @@ static void task_fork_fair(struct task_struct *p)
 		resched_curr(rq);
 	}
 
+	///加入就绪队列时，会重新计算vruntime
 	se->vruntime -= cfs_rq->min_vruntime;
 	rq_unlock(rq, &rf);
 }
