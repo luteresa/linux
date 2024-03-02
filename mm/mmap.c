@@ -1659,6 +1659,7 @@ generic_get_unmapped_area(struct file *filp, unsigned long addr,
 	if (flags & MAP_FIXED)
 		return addr;
 
+///如果addr刚好空闲，且满足本次分配，返回首地址
 	if (addr) {
 		addr = PAGE_ALIGN(addr);
 		vma = find_vma_prev(mm, addr, &prev);
@@ -1668,6 +1669,7 @@ generic_get_unmapped_area(struct file *filp, unsigned long addr,
 			return addr;
 	}
 
+///不满足需求，初始化info，进一步扫描mmap映射区查找满足请求的内存
 	info.flags = 0;
 	info.length = len;
 	info.low_limit = mm->mmap_base;
@@ -1718,6 +1720,7 @@ generic_get_unmapped_area_topdown(struct file *filp, unsigned long addr,
 			return addr;
 	}
 
+///从高向低遍历
 	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
 	info.length = len;
 	info.low_limit = max(PAGE_SIZE, mmap_min_addr);
@@ -1732,6 +1735,7 @@ generic_get_unmapped_area_topdown(struct file *filp, unsigned long addr,
 	 * can happen with large stack limits and large mmap()
 	 * allocations.
 	 */
+	 ///若从高低之开始分配失败，从低往高再分配一次
 	if (offset_in_page(addr)) {
 		VM_BUG_ON(addr != -ENOMEM);
 		info.flags = 0;

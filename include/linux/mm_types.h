@@ -446,7 +446,7 @@ struct anon_vma_name {
 struct vm_area_struct {
 	/* The first cache line has the info for VMA tree walking. */
 
-	///VMA在进程地址空间内的起始地址，结束地址
+	///VMA在进程地址空间内的起始地址，结束地址 ,[start,end)
 	unsigned long vm_start;		/* Our start address within vm_mm. */  
 	unsigned long vm_end;		/* The first byte after our end address
 					   within vm_mm. */
@@ -458,10 +458,10 @@ struct vm_area_struct {
 	 * Access permissions of this VMA.
 	 * See vmf_insert_mixed_prot() for discussion.
 	 */
-	 ///vma的访问权限
+	 ///当前vma的访问权限
 	pgprot_t vm_page_prot;  
 	
-	///描述该vma的一组标志位
+	///描述该vma的属性
 	unsigned long vm_flags;		/* Flags, see mm.h. */  
 
 	/*
@@ -505,7 +505,7 @@ struct vm_area_struct {
 	///指定文件映射的偏移量，单位页
 	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE  
 					   units */
-	 ///指向映射的文件
+	 ///指向映射的文件,匿名页为NULL
 	struct file * vm_file;		/* File we map to (can be NULL). */ 
 	void * vm_private_data;		/* was vm_pte (shared mem) */
 
@@ -531,16 +531,19 @@ struct mm_struct {
 				unsigned long addr, unsigned long len,
 				unsigned long pgoff, unsigned long flags);  
 #endif
-		///mmap空间起始地址
+		///mmap内存开始映射的起始地址
 		unsigned long mmap_base;	/* base of mmap area */  
+		///按照bottom-up方向分配内存的起始地址
 		unsigned long mmap_legacy_base;	/* base of mmap area in bottom-up allocations */
 #ifdef CONFIG_HAVE_ARCH_COMPAT_MMAP_BASES
 		/* Base addresses for compatible mmap() */
 		unsigned long mmap_compat_base;
 		unsigned long mmap_compat_legacy_base;
 #endif
+		///task的虚拟地址可见大小
 		unsigned long task_size;	/* size of task vm space */
-		pgd_t * pgd;   ///指向进程一级页表
+		///指向进程一级页表,页全局目录地址
+		pgd_t * pgd;
 
 #ifdef CONFIG_MEMBARRIER
 		/**
@@ -561,7 +564,8 @@ struct mm_struct {
 		 * @mm_count (which may then free the &struct mm_struct if
 		 * @mm_count also drops to 0).
 		 */
-		atomic_t mm_users;  ///正在使用该进程空间的线程数目
+		 ///正在使用该进程空间的线程数目
+		atomic_t mm_users;  
 
 		/**
 		 * @mm_count: The number of references to &struct mm_struct
@@ -570,11 +574,13 @@ struct mm_struct {
 		 * Use mmgrab()/mmdrop() to modify. When this drops to 0, the
 		 * &struct mm_struct is freed.
 		 */
-		atomic_t mm_count; ///mm_struct结构体的主引用计数
+		 ///mm_struct结构体的主引用计数
+		atomic_t mm_count; 
 
 #ifdef CONFIG_MMU
 		atomic_long_t pgtables_bytes;	/* PTE page table pages */
 #endif
+		///mm中vma个数
 		int map_count;			/* number of VMAs */
 
 		spinlock_t page_table_lock; /* Protects page tables and some
@@ -592,7 +598,8 @@ struct mm_struct {
 		 * mmap_lock, which can easily push the 2 fields into one
 		 * cacheline.
 		 */
-		struct rw_semaphore mmap_lock;  ///保护vma的读写信号量
+///保护vma的读写信号量,读操作场景比写操作多，所有用读写信号量
+		struct rw_semaphore mmap_lock;  
 
 ///所有的mm_struct结构都连接到一个双向链表中，链表头是init_mm内存描述符
 		struct list_head mmlist; /* List of maybe swapped mm's.	These
@@ -605,7 +612,8 @@ struct mm_struct {
 		unsigned long hiwater_rss; /* High-watermark of RSS usage */
 		unsigned long hiwater_vm;  /* High-water virtual memory usage */
 
-		unsigned long total_vm;	   /* Total pages mapped */    ///已经使用的进程地址空间总和
+		///已经使用的进程地址空间总和
+		unsigned long total_vm;	   /* Total pages mapped */    
 		unsigned long locked_vm;   /* Pages that have PG_mlocked set */
 		atomic64_t    pinned_vm;   /* Refcount permanently increased */
 		unsigned long data_vm;	   /* VM_WRITE & ~VM_SHARED & ~VM_STACK */
@@ -621,8 +629,16 @@ struct mm_struct {
 		seqcount_t write_protect_seq;
 
 		spinlock_t arg_lock; /* protect the below fields */
-		unsigned long start_code, end_code, start_data, end_data;   ///代码段，数据段的起始地址和结束地址
-		unsigned long start_brk, brk, start_stack;                  ///start_brk：堆空间的起始地址，brk:当前堆中vma的结束地址
+		///代码段，数据段的起始地址和结束地址
+		unsigned long start_code, end_code, start_data, end_data;   
+
+		///start_brk：task堆空间的起始地址，
+		///brk:task堆的结束地址,brk通过sys_brk()修改
+		///start_stack:用户态栈起始地址
+		unsigned long start_brk, brk, start_stack;                  
+
+		///arg:应用程序启动时传递参数字符串起始地址和结束地址
+		///env:环境变量起始地址和结束地址
 		unsigned long arg_start, arg_end, env_start, env_end;
 
 		unsigned long saved_auxv[AT_VECTOR_SIZE]; /* for /proc/PID/auxv */
