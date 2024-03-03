@@ -986,6 +986,7 @@ static unsigned long shrink_slab_memcg(gfp_t gfp_mask, int nid,
  *
  * Returns the number of reclaimed slab objects.
  */
+ ///回收内核slab页面
 static unsigned long shrink_slab(gfp_t gfp_mask, int nid,
 				 struct mem_cgroup *memcg,
 				 int priority)
@@ -6902,12 +6903,15 @@ static void kswapd_age_node(struct pglist_data *pgdat, struct scan_control *sc)
 		return;
 
 	lruvec = mem_cgroup_lruvec(NULL, pgdat);
+	///如果inactive LRU的page数量小于一定比例,就进行老化
+    ///即从active LRU尾部移动一部分page到inactive LRU
 	if (!inactive_is_low(lruvec, LRU_INACTIVE_ANON))
 		return;
 
 	memcg = mem_cgroup_iter(NULL, NULL, NULL);
 	do {
 		lruvec = mem_cgroup_lruvec(memcg, pgdat);
+		///执行老化
 		shrink_active_list(SWAP_CLUSTER_MAX, lruvec,
 				   sc, LRU_ACTIVE_ANON);
 		memcg = mem_cgroup_iter(NULL, memcg, NULL);
@@ -7396,6 +7400,7 @@ static void kswapd_try_to_sleep(pg_data_t *pgdat, int alloc_order, int reclaim_o
 		 * We have freed the memory, now we should compact it to make
 		 * allocation of the requested order possible.
 		 */
+		 ///唤醒kcompacted做内存规整
 		wakeup_kcompactd(pgdat, alloc_order, highest_zoneidx);
 
 		///尝试短睡100ms，如果返回不为0，则说明没有100ms之内被唤醒了
@@ -7474,6 +7479,7 @@ static int kswapd(void *p)
 	struct task_struct *tsk = current;
 	const struct cpumask *cpumask = cpumask_of_node(pgdat->node_id);
 
+///绑CPU核
 	if (!cpumask_empty(cpumask))
 		set_cpus_allowed_ptr(tsk, cpumask);
 
@@ -7489,9 +7495,9 @@ static int kswapd(void *p)
 	 * us from recursively trying to free more memory as we're
 	 * trying to free the first piece of memory in the first place).
 	 */
-	 ///PF_MEMALLOC:允许使用系统预留内存，即不考虑水位
+	 ///PF_MEMALLOC:关键线程,允许使用系统预留内存，即不考虑水位
 	 ///PF_SWAPWRITE:允许写交换分区
-	 ///PF_KSWAPD:标志kswapd内核现存
+	 ///PF_KSWAPD:标志kswapd内核线程, 区分其他线程，比如get_scan_count中用于调节swappiness
 	tsk->flags |= PF_MEMALLOC | PF_KSWAPD;
 	set_freezable();
 
@@ -7501,7 +7507,7 @@ static int kswapd(void *p)
 	for ( ; ; ) {
 		bool ret;
 
-	///回收页面数量，2的order次幂
+	///回收页面数量，2的order次幂, 一般从alloc_pages_slowpath()传下来
 		alloc_order = reclaim_order = READ_ONCE(pgdat->kswapd_order);
 	
 	///classzone_idx内核线程扫描和回收的最高zone
