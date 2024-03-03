@@ -341,7 +341,7 @@ const struct sched_class fair_sched_class;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 
-///遍历组内所有se
+///依次往上遍历所有父se
 /* Walk up scheduling entities hierarchy */
 #define for_each_sched_entity(se) \
 		for (; se; se = se->parent)
@@ -4264,6 +4264,7 @@ static void remove_entity_load_avg(struct sched_entity *se)
 	raw_spin_unlock_irqrestore(&cfs_rq->removed.lock, flags);
 }
 
+///获取CFS就绪队列平均负载，用于SMP负载均衡
 static inline unsigned long cfs_rq_runnable_avg(struct cfs_rq *cfs_rq)
 {
 	return cfs_rq->avg.runnable_avg;
@@ -4276,6 +4277,7 @@ static inline unsigned long cfs_rq_load_avg(struct cfs_rq *cfs_rq)
 
 static int newidle_balance(struct rq *this_rq, struct rq_flags *rf);
 
+///获取当前进程量化计算能力,用于EAS调度器和CPU调频
 static inline unsigned long task_util(struct task_struct *p)
 {
 	return READ_ONCE(p->se.avg.util_avg);
@@ -4951,6 +4953,7 @@ entity_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr, int queued)
 
 	///更新当前进程实体和就绪队列rq的负载
 	update_load_avg(cfs_rq, curr, UPDATE_TG);
+	///更新group负载
 	update_cfs_group(curr);
 
 #ifdef CONFIG_SCHED_HRTICK
@@ -6832,6 +6835,7 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
  * Predicts what cpu_util(@cpu) would return if @p was removed from @cpu
  * (@dst_cpu = -1) or migrated to @dst_cpu.
  */
+///获取CPU当前量化计算能力,用于EAS调度器和CPU调频
 static unsigned long cpu_util_next(int cpu, struct task_struct *p, int dst_cpu)
 {
 	struct cfs_rq *cfs_rq = &cpu_rq(cpu)->cfs;
@@ -7075,6 +7079,7 @@ compute_energy(struct energy_env *eenv, struct perf_domain *pd,
  * other use-cases too. So, until someone finds a better way to solve this,
  * let's keep things simple by re-using the existing slow path.
  */
+ ///EAS选核
 static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 {
 	struct cpumask *cpus = this_cpu_cpumask_var_ptr(select_rq_mask);
@@ -7229,7 +7234,14 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
 	int cpu = smp_processor_id();
 	int new_cpu = prev_cpu;
 	int want_affine = 0;
+
 	/* SD_flags and WF_flags share the first nibble */
+/*
+三种情况
+  #define WF_EXEC     0x02 / Wakeup after exec; maps to SD_BALANCE_EXEC /
+  #define WF_FORK     0x04 / Wakeup after fork; maps to SD_BALANCE_FORK /
+  #define WF_TTWU     0x08 / Wakeup;            maps to SD_BALANCE_WAKE /
+*/
 	int sd_flag = wake_flags & 0xF;
 
 	/*
@@ -7240,6 +7252,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
 		record_wakee(p);
 
 		if (sched_energy_enabled()) {
+			///eas选核
 			new_cpu = find_energy_efficient_cpu(p, prev_cpu);
 			if (new_cpu >= 0)
 				return new_cpu;
@@ -7250,6 +7263,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
 	}
 
 	rcu_read_lock();
+	///遍历调度域
 	for_each_domain(cpu, tmp) {
 		/*
 		 * If both 'cpu' and 'prev_cpu' are part of this domain,
@@ -7277,9 +7291,11 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
 
 	if (unlikely(sd)) {
 		/* Slow path */
+		///慢速路径，找最闲CPU
 		new_cpu = find_idlest_cpu(sd, p, cpu, prev_cpu, sd_flag);
 	} else if (wake_flags & WF_TTWU) { /* XXX always ? */
 		/* Fast path */
+		///优先选上一次运行的CPU
 		new_cpu = select_idle_sibling(p, prev_cpu, new_cpu);
 	}
 	rcu_read_unlock();
@@ -7562,6 +7578,7 @@ again:
 struct task_struct *
 pick_next_task_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 {
+	///根cfs就绪队列
 	struct cfs_rq *cfs_rq = &rq->cfs;
 	struct sched_entity *se;
 	struct task_struct *p;
@@ -7571,6 +7588,7 @@ again:
 	if (!sched_fair_runnable(rq))
 		goto idle;
 
+///组调度
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	if (!prev || prev->sched_class != &fair_sched_class)
 		goto simple;
@@ -7614,7 +7632,12 @@ again:
 			}
 		}
 
+		///从就绪队列选择最优先se
 		se = pick_next_entity(cfs_rq, curr);
+
+		///如果时task se，那么cfs_rq=NULL
+		///如果是group se，cfs_rq=组se对应的cfs_rq
+		///如果是group se，继续从group的cfs_rq中选择下一个最优先的se，循环执行，直到找到最底层task se
 		cfs_rq = group_cfs_rq(se);
 	} while (cfs_rq);
 
@@ -11615,8 +11638,11 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &curr->se;
 
-	///遍历当前进程调度实体
-	///如果开启组机制，还需要调度上一级调度实体；
+	/* 如果开启组机制，还需要遍历上一级调度实体；依次往上遍历所有父se
+	 * 只要有一个se超过分配限额时间，就需要重新调度
+     *	
+	 * 否则就处理本se
+	 */
 	for_each_sched_entity(se) {
 		cfs_rq = cfs_rq_of(se);
         ///检查是否需要调度
