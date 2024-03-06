@@ -92,6 +92,7 @@ static __always_inline enum lru_list folio_lru_list(struct folio *folio)
 	if (folio_test_unevictable(folio))
 		return LRU_UNEVICTABLE;
 
+	///默认放入不活跃链表
 	lru = folio_is_file_lru(folio) ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON;
 	if (folio_test_active(folio))
 		lru += LRU_ACTIVE;

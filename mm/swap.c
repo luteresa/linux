@@ -61,6 +61,7 @@ static DEFINE_PER_CPU(struct lru_rotate, lru_rotate) = {
  */
 struct cpu_fbatches {
 	local_lock_t lock;
+	///可以添加到lru链表的，缓存页向量(满员后，统一添加到相应LRU链表中)
 	struct folio_batch lru_add;
 	struct folio_batch lru_deactivate_file;
 	struct folio_batch lru_deactivate;
@@ -69,6 +70,7 @@ struct cpu_fbatches {
 	struct folio_batch activate;
 #endif
 };
+///定义per cpu变量的缓存页向量组
 static DEFINE_PER_CPU(struct cpu_fbatches, cpu_fbatches) = {
 	.lock = INIT_LOCAL_LOCK(lock),
 };
@@ -551,6 +553,8 @@ void folio_add_lru(struct folio *folio)
 	folio_get(folio);
 	local_lock(&cpu_fbatches.lock);
 	fbatch = this_cpu_ptr(&cpu_fbatches.lru_add);
+	///将page加入页向量组，并判断是否需要刷新
+	///这里为提高性能，对page加入lru做了个批处理，一次性加入15个page
 	folio_batch_add_and_move(fbatch, folio, lru_add_fn);
 	local_unlock(&cpu_fbatches.lock);
 }
@@ -600,14 +604,18 @@ static void lru_deactivate_file_fn(struct lruvec *lruvec, struct folio *folio)
 	bool active = folio_test_active(folio);
 	long nr_pages = folio_nr_pages(folio);
 
+///page不可回收,退出
 	if (folio_test_unevictable(folio))
 		return;
 
 	/* Some processes are using the folio */
+	///page被映射使用中，退出
 	if (folio_mapped(folio))
 		return;
 
+	///从ACTIVE_LRU中删除
 	lruvec_del_folio(lruvec, folio);
+	///清除PG_active和PG_referenced标记
 	folio_clear_active(folio);
 	folio_clear_referenced(folio);
 
@@ -618,13 +626,16 @@ static void lru_deactivate_file_fn(struct lruvec *lruvec, struct folio *folio)
 		 * race window is _really_ small and  it's not a critical
 		 * problem.
 		 */
+		 ///如果需要回写或脏页，加到LRU链表头
 		lruvec_add_folio(lruvec, folio);
+		///设置PG_reclaim标记
 		folio_set_reclaim(folio);
 	} else {
 		/*
 		 * The folio's writeback ended while it was in the batch.
 		 * We move that folio to the tail of the inactive list.
 		 */
+		 ///加到LRU链表尾，尽快回收
 		lruvec_add_folio_tail(lruvec, folio);
 		__count_vm_events(PGROTATED, nr_pages);
 	}
@@ -724,6 +735,7 @@ void lru_add_drain_cpu(int cpu)
  *
  * Context: Caller holds a reference on the folio.
  */
+ ///将文件页从LRU_ACTIVE放入LRU_INACTIVE
 void deactivate_file_folio(struct folio *folio)
 {
 	struct folio_batch *fbatch;

@@ -95,6 +95,9 @@ struct scan_control {
 	/* Can active folios be deactivated as part of reclaim? */
 #define DEACTIVATE_ANON 1
 #define DEACTIVATE_FILE 2
+	///1:强制从LRU_ACTIVE_ANON回收
+	///2:强制从LRU_ACTIVE_FILE回收
+	///不设置，skipped_deactivate将置1
 	unsigned int may_deactivate:2;
 	unsigned int force_deactivate:1;
 	unsigned int skipped_deactivate:1;
@@ -1830,7 +1833,8 @@ retry:
 		}
 
 		if (!ignore_references)
-			references = folio_check_references(folio, sc);   ///获取页面操作类型
+  			///获取页面操作类型
+			references = folio_check_references(folio, sc);
 
 		switch (references) {
 		case FOLIOREF_ACTIVATE:
@@ -1906,6 +1910,7 @@ retry:
 		 * their own pass through this function and be accounted
 		 * then.
 		 */
+		 ///成功添加swap cache
 		if ((nr_pages > 1) && !folio_test_large(folio)) {
 			sc->nr_scanned -= (nr_pages - 1);
 			nr_pages = 1;
@@ -2035,6 +2040,7 @@ retry:
 		 * (refcount == 1) it can be freed.  Otherwise, leave
 		 * the folio on the LRU so it is swappable.
 		 */
+		 ///回写完成
 		 ///页面处于块设备的buffer_head缓存，用try_to_release_page
 		if (folio_has_private(folio)) {
 			if (!filemap_release_folio(folio, sc->gfp_mask))
@@ -2241,6 +2247,7 @@ static unsigned long isolate_lru_folios(unsigned long nr_to_scan,
 		unsigned long *nr_scanned, struct scan_control *sc,
 		enum lru_list lru)
 {
+	///需要迁移的源链表
 	struct list_head *src = &lruvec->lists[lru];
 	unsigned long nr_taken = 0;
 	unsigned long nr_zone_taken[MAX_NR_ZONES] = { 0 };
@@ -2251,6 +2258,8 @@ static unsigned long isolate_lru_folios(unsigned long nr_to_scan,
 
 	total_scan = 0;
 	scan = 0;
+
+	///一页页扫描，直到页数大于nr_to_scan，或src为空
 	while (scan < nr_to_scan && !list_empty(src)) {
 		struct list_head *move_to = src;
 		struct folio *folio;
@@ -2261,6 +2270,7 @@ static unsigned long isolate_lru_folios(unsigned long nr_to_scan,
 		nr_pages = folio_nr_pages(folio);
 		total_scan += nr_pages;
 
+		///超过范围，存放在skip数组,跳过	
 		if (folio_zonenum(folio) > sc->reclaim_idx) {
 			nr_skipped[folio_zonenum(folio)] += nr_pages;
 			move_to = &folios_skipped;
@@ -2295,6 +2305,7 @@ static unsigned long isolate_lru_folios(unsigned long nr_to_scan,
 			goto move;
 		}
 
+		///确认可以迁移
 		nr_taken += nr_pages;
 		nr_zone_taken[folio_zonenum(folio)] += nr_pages;
 		move_to = dst;
@@ -2309,18 +2320,20 @@ move:
 	 * scanning would soon rescan the same folios to skip and waste lots
 	 * of cpu cycles.
 	 */
+	 ///处理skip页面
 	if (!list_empty(&folios_skipped)) {
 		int zid;
 
+		///搬到链表头部
 		list_splice(&folios_skipped, src);
 		for (zid = 0; zid < MAX_NR_ZONES; zid++) {
 			if (!nr_skipped[zid])
 				continue;
-
 			__count_zid_vm_events(PGSCAN_SKIP, zid, nr_skipped[zid]);
 			skipped += nr_skipped[zid];
 		}
 	}
+	///统计扫描总页数
 	*nr_scanned = total_scan;
 	trace_mm_vmscan_lru_isolate(sc->reclaim_idx, sc->order, nr_to_scan,
 				    total_scan, skipped, nr_taken,
@@ -2537,6 +2550,7 @@ static unsigned long shrink_inactive_list(unsigned long nr_to_scan,
 			return SWAP_CLUSTER_MAX;
 	}
 
+///当前CPU的多个缓存pagevec加入各自的lru链表中
 	lru_add_drain();
 
 	spin_lock_irq(&lruvec->lru_lock);
@@ -2666,11 +2680,12 @@ static void shrink_active_list(unsigned long nr_to_scan,
 	///获取内存节点
 	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
 
+///当前CPU的多个缓存pagevec添加到各自的LRU链表中
 	lru_add_drain();
 
 	spin_lock_irq(&lruvec->lru_lock);
 
-	///将页面批量迁移到临时链表l_hold中
+	///将页面批量迁移到临时链表l_hold中,从链表尾开始扫描
 	nr_taken = isolate_lru_folios(nr_to_scan, lruvec, &l_hold,
 				     &nr_scanned, sc, lru);
 
@@ -2682,6 +2697,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 		__count_vm_events(PGREFILL, nr_scanned);
 	__count_memcg_events(lruvec_memcg(lruvec), PGREFILL, nr_scanned);
 
+///页面已经迁移到l_hold，释放lru锁
 	spin_unlock_irq(&lruvec->lru_lock);
 
 	///扫描临时链表l_hold，有些页面放到不活跃链表，有些会放回到活跃链表
@@ -2719,6 +2735,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 			 * IO, plus JVM can create lots of anon VM_EXEC folios,
 			 * so we ignore them here.
 			 */
+		    ///代码段，缓存文件页
 			if ((vm_flags & VM_EXEC) && folio_is_file_lru(folio)) {
 				nr_rotated += folio_nr_pages(folio);
 				///放回活跃链表
@@ -2729,6 +2746,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 
 		folio_clear_active(folio);	/* we are de-activating */
 		folio_set_workingset(folio);
+		///最近没访问过，放入inactive list
 		///加入不活跃链表
 		list_add(&folio->lru, &l_inactive);
 	}
@@ -2751,6 +2769,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 	spin_unlock_irq(&lruvec->lru_lock);
 
 	mem_cgroup_uncharge_list(&l_active);
+	///释放页面到buddy系统
 	free_unref_page_list(&l_active);
 	trace_mm_vmscan_lru_shrink_active(pgdat->node_id, nr_taken, nr_activate,
 			nr_deactivate, nr_rotated, sc->priority, file);
@@ -2817,7 +2836,7 @@ static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
 				 struct lruvec *lruvec, struct scan_control *sc)
 {
 	if (is_active_lru(lru)) {
-		///扫描活跃的文件映射链表
+		///当前lru是active,但是inactive lru页面很少,需要迁移一部分active_list到inactive_list
 		if (sc->may_deactivate & (1 << is_file_lru(lru)))
 			shrink_active_list(nr_to_scan, lruvec, sc, lru);
 		else
@@ -5996,6 +6015,7 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
 	}
 
 	///计算每个链表应该扫描的页面数量，结果放在nr[]
+	///根据swappiness参数，计算应扫描页面数量
 	get_scan_count(lruvec, sc, nr);
 
 	/* Record the original scan target for proportional adjustments later */
@@ -6020,6 +6040,7 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
 
 	///遍历所有链表，回收页面
 	///主要处理不活跃匿名页面，活跃文件映射页面和不活跃文件映射页面
+	///跳过active anon lru
 	while (nr[LRU_INACTIVE_ANON] || nr[LRU_ACTIVE_FILE] ||
 					nr[LRU_INACTIVE_FILE]) {
 		unsigned long nr_anon, nr_file, percentage;
@@ -6183,6 +6204,7 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
 	struct mem_cgroup *target_memcg = sc->target_mem_cgroup;
 	struct mem_cgroup *memcg;
 
+///获取memcg,如果没指定，默认从root_mem_cgroup开始
 	memcg = mem_cgroup_iter(target_memcg, NULL, NULL);
 	do {
 		///获取LRU链表的集合
@@ -6247,11 +6269,13 @@ static void shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 	struct lruvec *target_lruvec;
 	bool reclaimable = false;
 
+	///获取LRU vec，如果没有配置memcp，直接从pgdat节点获取LRU向量表
 	target_lruvec = mem_cgroup_lruvec(sc->target_mem_cgroup, pgdat);
 
 again:
 	memset(&sc->nr, 0, sizeof(sc->nr));
 
+///获取已经扫描的可回收和可扫描页面
 	nr_reclaimed = sc->nr_reclaimed;
 	nr_scanned = sc->nr_scanned;
 
@@ -6260,6 +6284,7 @@ again:
 	///执行memory cgoup页面回收
 	shrink_node_memcgs(pgdat, sc);
 
+///slab回收也加上
 	if (reclaim_state) {
 		sc->nr_reclaimed += reclaim_state->reclaimed_slab;
 		reclaim_state->reclaimed_slab = 0;
@@ -6267,6 +6292,7 @@ again:
 
 	/* Record the subtree's reclaim efficiency */
 	if (!sc->proactive)
+	///记录内存回收数据
 		vmpressure(sc->gfp_mask, sc->target_mem_cgroup, true,
 			   sc->nr_scanned - nr_scanned,
 			   sc->nr_reclaimed - nr_reclaimed);
@@ -6274,7 +6300,7 @@ again:
 	if (sc->nr_reclaimed - nr_reclaimed)
 		reclaimable = true;
 
-	///不止kswapd现存调用该函数
+	///不止kswapd线程调用该函数
 	if (current_is_kswapd()) {
 		/*
 		 * If reclaim is isolating dirty pages under writeback,
@@ -6309,6 +6335,7 @@ again:
 		 * faster than they are written so forcibly stall
 		 * until some pages complete writeback.
 		 */
+		 ///发现有大量页面等待会写,等待100ms
 		if (sc->nr.immediate)
 			reclaim_throttle(pgdat, VMSCAN_THROTTLE_WRITEBACK);
 	}
@@ -6331,6 +6358,7 @@ again:
 	 * starts encountering unqueued dirty pages or cycling through
 	 * the LRU too quickly.
 	 */
+	 ///如果直接回写，脏页过多，休眠阻塞一段时间
 	if (!current_is_kswapd() && current_may_throttle() &&
 	    !sc->hibernation_mode &&
 	    test_bit(LRUVEC_CONGESTED, &target_lruvec->flags))
