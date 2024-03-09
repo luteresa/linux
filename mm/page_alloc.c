@@ -1826,6 +1826,7 @@ void __init memblock_free_pages(struct page *page, unsigned long pfn,
 		/* KMSAN will take care of these pages. */
 		return;
 	}
+	///加入伙伴系统
 	__free_pages_core(page, order);
 }
 
