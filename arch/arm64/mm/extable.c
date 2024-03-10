@@ -60,6 +60,7 @@ bool fixup_exception(struct pt_regs *regs)
 {
 	const struct exception_table_entry *ex;
 
+///查询异常表
 	ex = search_exception_tables(instruction_pointer(regs));
 	if (!ex)
 		return false;
@@ -69,6 +70,7 @@ bool fixup_exception(struct pt_regs *regs)
 		return ex_handler_bpf(ex, regs);
 	case EX_TYPE_UACCESS_ERR_ZERO:
 	case EX_TYPE_KACCESS_ERR_ZERO:
+///修正地址，保存到regs->pc，异常返回会自动恢复到PC
 		return ex_handler_uaccess_err_zero(ex, regs);
 	case EX_TYPE_LOAD_UNALIGNED_ZEROPAD:
 		return ex_handler_load_unaligned_zeropad(ex, regs);

@@ -232,6 +232,9 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
  * The "__xxx_error" versions set the third argument to -EFAULT if an error
  * occurs, and leave it unchanged on success.
  */
+///异常修正地址.fixup
+///填写异常表_ASM_EXTABLE(1b, 3b)	
+///异常表条目中的值是相对值
 #define __get_mem_asm(load, reg, x, addr, err, type)			\
 	asm volatile(							\
 	"1:	" load "	" reg "1, [%2]\n"			\
