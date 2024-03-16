@@ -28,6 +28,7 @@
  * Approximate:
  *   val * y^n,    where y^32 ~= 0.5 (~1 scheduling period)
  */
+ ///乘以对应衰减参数
 static u64 decay_load(u64 val, u64 n)
 {
 	unsigned int local_n;
@@ -61,6 +62,7 @@ static u32 __accumulate_pelt_segments(u64 periods, u32 d1, u32 d3)
 	/*
 	 * c1 = d1 y^p
 	 */
+	 ///c1直接做衰减
 	c1 = decay_load((u64)d1, periods);
 
 	/*
@@ -72,6 +74,7 @@ static u32 __accumulate_pelt_segments(u64 periods, u32 d1, u32 d3)
 	 *    = 1024 ( \Sum y^n - \Sum y^n - y^0 )
 	 *              n=0        n=p
 	 */
+	 ///简化计算
 	c2 = LOAD_AVG_MAX - decay_load(LOAD_AVG_MAX, periods) - 1024;
 
 	return c1 + c2 + c3;
@@ -98,6 +101,7 @@ static u32 __accumulate_pelt_segments(u64 periods, u32 d1, u32 d3)
  *      d1 y^p + 1024 \Sum y^n + d3 y^0		(Step 2)
  *                     n=1
  */
+ ///分三部分求和
 static __always_inline u32
 accumulate_sum(u64 delta, struct sched_avg *sa,
 	       unsigned long load, unsigned long runnable, int running)
@@ -112,6 +116,7 @@ accumulate_sum(u64 delta, struct sched_avg *sa,
 	 * Step 1: decay old *_sum if we crossed period boundaries.
 	 */
 	if (periods) {
+		///上一次计算负载值，做衰减
 		sa->load_sum = decay_load(sa->load_sum, periods);
 		sa->runnable_sum =
 			decay_load(sa->runnable_sum, periods);
@@ -132,6 +137,7 @@ accumulate_sum(u64 delta, struct sched_avg *sa,
 			 * the below usage of @contrib to disappear entirely,
 			 * so no point in calculating it.
 			 */
+			 ///计算本次负载值
 			contrib = __accumulate_pelt_segments(periods,
 					1024 - sa->period_contrib, delta);
 		}
@@ -176,6 +182,7 @@ accumulate_sum(u64 delta, struct sched_avg *sa,
  *   load_avg = u_0` + y*(u_0 + u_1*y + u_2*y^2 + ... )
  *            = u_0 + u_1*y + u_2*y^2 + ... [re-labeling u_i --> u_{i+1}]
  */
+ ///更新工作负载
 static __always_inline int
 ___update_load_sum(u64 now, struct sched_avg *sa,
 		  unsigned long load, unsigned long runnable, int running)
@@ -187,6 +194,7 @@ ___update_load_sum(u64 now, struct sched_avg *sa,
 	 * This should only happen when time goes backwards, which it
 	 * unfortunately does during sched clock init when we swap over to TSC.
 	 */
+	 ///防止溢出
 	if ((s64)delta < 0) {
 		sa->last_update_time = now;
 		return 0;
@@ -200,6 +208,7 @@ ___update_load_sum(u64 now, struct sched_avg *sa,
 	if (!delta)
 		return 0;
 
+	///最后更新时间
 	sa->last_update_time += delta << 10;
 
 	/*
@@ -223,6 +232,7 @@ ___update_load_sum(u64 now, struct sched_avg *sa,
 	 * Step 1: accumulate *_sum since last_update_time. If we haven't
 	 * crossed period boundaries, finish.
 	 */
+	 ///计算工作负载
 	if (!accumulate_sum(delta, sa, load, runnable, running))
 		return 0;
 
@@ -253,6 +263,7 @@ ___update_load_sum(u64 now, struct sched_avg *sa,
  * the period_contrib of cfs_rq when updating the sched_avg of a sched_entity
  * if it's more convenient.
  */
+ ///计算量化负载
 static __always_inline void
 ___update_load_avg(struct sched_avg *sa, unsigned long load)
 {

@@ -10261,16 +10261,22 @@ void sched_move_task(struct task_struct *tsk)
 	rq = task_rq_lock(tsk, &rf);
 	update_rq_clock(rq);
 
+	///判定进程是否正在运行
 	running = task_current(rq, tsk);
+	///进程是否在就绪队列或正在运行,on_rq
 	queued = task_on_rq_queued(tsk);
 
+	///就绪态，先把进程退出就绪态
 	if (queued)
 		dequeue_task(rq, tsk, queue_flags);
+	///正在运行，放回就绪态队列
 	if (running)
 		put_prev_task(rq, tsk);
 
+	///调用CFS调度类操作方法集, 将task加入group
 	sched_change_group(tsk);
 
+	///退出就绪队列的进程和组，重新加入就绪队列
 	if (queued)
 		enqueue_task(rq, tsk, queue_flags);
 	if (running) {
@@ -10367,6 +10373,7 @@ static void cpu_cgroup_attach(struct cgroup_taskset *tset)
 	struct cgroup_subsys_state *css;
 
 	cgroup_taskset_for_each(task, css, tset)
+	///将进程task放入组调度中
 		sched_move_task(task);
 }
 
