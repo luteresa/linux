@@ -20,8 +20,11 @@
  * @flags:	see "em_perf_state flags" description below.
  */
 struct em_perf_state {
+///频点kHz
 	unsigned long frequency;
+///频点对应的功耗值mW
 	unsigned long power;
+///方便计算的能效系数 cost = power*max_freq/freq；
 	unsigned long cost;
 	unsigned long flags;
 };
@@ -53,9 +56,12 @@ struct em_perf_state {
  * field is unused.
  */
 struct em_perf_domain {
+///保存各级算力信息的表
 	struct em_perf_state *table;
+///CPU的算力级数，一个频点对应一级算力
 	int nr_perf_states;
 	unsigned long flags;
+///当前pd的所有CPU core
 	unsigned long cpus[];
 };
 
