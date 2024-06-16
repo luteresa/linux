@@ -363,7 +363,7 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 	ptrauth_thread_init_kernel(p);
 
 	if (likely(!args->fn)) {
-		///子进程为用户进程
+		///子进程为用户线程
 		*childregs = *current_pt_regs();
 		childregs->regs[0] = 0;  ///子进程返回值
 
@@ -391,6 +391,7 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 			p->thread.tpidr2_el0 = 0;
 		}
 	} else {
+		///子进程为内核线程
 		/*
 		 * A kthread has no context to ERET to, so ensure any buggy
 		 * ERET is treated as an illegal exception return.
@@ -401,6 +402,7 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 		memset(childregs, 0, sizeof(struct pt_regs));
 		childregs->pstate = PSR_MODE_EL1h | PSR_IL_BIT;
 
+   ///x19内核线程回调函数
 		p->thread.cpu_context.x19 = (unsigned long)args->fn;
 		p->thread.cpu_context.x20 = (unsigned long)args->fn_arg;
 	}
