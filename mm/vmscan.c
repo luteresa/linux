@@ -2576,11 +2576,9 @@ static unsigned long shrink_inactive_list(unsigned long nr_to_scan,
 	nr_reclaimed = shrink_folio_list(&folio_list, pgdat, sc, &stat, false);
 
 	spin_lock_irq(&lruvec->lru_lock);
+	///page_list链表剩余页面迁回不活跃链表
 	move_folios_to_lru(lruvec, &folio_list);
 
-	///page_list链表剩余页面迁回不活跃链表
-	move_pages_to_lru(lruvec, &page_list);
-	
 	///减少NR_ISOLATED_ANON计数
 	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, -nr_taken);
 	item = current_is_kswapd() ? PGSTEAL_KSWAPD : PGSTEAL_DIRECT;
