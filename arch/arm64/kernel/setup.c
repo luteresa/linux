@@ -341,7 +341,11 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	///整理memblock的内存区域
 	arm64_memblock_init();
 
-	///至此，物理内存通过memblock模块添加入了系统，但此时只有dtb，Image所在的两段物理内存可以访问；
+	memblock_dump_all();
+
+	pr_info("memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
+	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
+	///至此，物理内存添加入了memblock系统，但此时只有dtb，Image所在的两段物理内存可以访问；
 	//其他区域的物理内存，还没建立映射，可以通过memblock_alloc分配，但不能访问；
 	//接下来通过paging_init建立不能访问的物理区域的页表;
 	//

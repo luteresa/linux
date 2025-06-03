@@ -647,6 +647,7 @@ void __init early_init_fdt_scan_reserved_mem(void)
 		memblock_reserve(base, size);
 	}
 
+///解析ftd的mem reserved
 	fdt_scan_reserved_mem();
 	fdt_reserve_elfcorehdr();
 	fdt_init_reserved_mem();
@@ -1259,6 +1260,7 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
 		size -= phys_offset - base;
 		base = phys_offset;
 	}
+	pr_warn("\n---memblock_add base:0x%llx, size=%dMB", base, size>>20);
 	memblock_add(base, size);
 }
 

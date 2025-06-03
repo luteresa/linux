@@ -276,7 +276,7 @@ early_param("mem", early_mem);
 void __init arm64_memblock_init(void)
 {
 	///计算虚拟地址可以覆盖的线性区域
-	s64 linear_region_size = PAGE_END - _PAGE_OFFSET(vabits_actual);
+	s64 linear_region_size = PAGE_END - _PAGE_OFFSET(vabits_actual);///48bit
 
 	/*
 	 * Corner case: 52-bit VA capable systems running KVM in nVHE mode may
@@ -292,7 +292,10 @@ void __init arm64_memblock_init(void)
 		linear_region_size = min_t(u64, linear_region_size, BIT(51));
 	}
 
+	pr_info("00memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
+	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
 ///移除实际物理地址以上的内存空间区域,比如VA_BITS=48,大于2^48以上地址，memblock不必存在
+///对于未memblock_add的memblock，实际啥都没干
 	/* Remove memory above our supported physical address size */
 	memblock_remove(1ULL << PHYS_MASK_SHIFT, ULLONG_MAX);
 
@@ -322,6 +325,8 @@ void __init arm64_memblock_init(void)
 		memblock_remove(0, memstart_addr);
 	}
 
+	pr_info("01memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
+	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
 	/*
 	 * If we are running with a 52-bit kernel VA config on a system that
 	 * does not support it, we have to place the available physical
@@ -400,6 +405,8 @@ void __init arm64_memblock_init(void)
 	///paging_init()后会释放
 	memblock_reserve(__pa_symbol(_stext), _end - _stext);
 
+	pr_info("02memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
+	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
 	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && phys_initrd_size) {
 		///计算initrd对应虚拟地址
 		/* the generic initrd code expects virtual addresses */
@@ -412,9 +419,13 @@ void __init arm64_memblock_init(void)
 	///cma具有reuseable属性，则不会从memblock.memory删除
 	early_init_fdt_scan_reserved_mem();
 
+	pr_info("03memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
+	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
 	if (!defer_reserve_crashkernel())
 		reserve_crashkernel();
 
+	pr_info("04memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
+	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
 	///ARM64中不需要高端内存，为了向前兼容，这里将高端内存的起始地址设置为物理内存的结束地址
 	high_memory = __va(memblock_end_of_DRAM() - 1) + 1;
 }

@@ -106,6 +106,7 @@ unsigned long min_low_pfn;
 unsigned long max_pfn;
 unsigned long long max_possible_pfn;
 
+///默认静止定义128个region
 static struct memblock_region memblock_memory_init_regions[INIT_MEMBLOCK_MEMORY_REGIONS] __initdata_memblock;
 static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_RESERVED_REGIONS] __initdata_memblock;
 #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
@@ -351,6 +352,7 @@ static void __init_memblock memblock_remove_region(struct memblock_type *type, u
 {
 	///总大小减去要删除region大小
 	type->total_size -= type->regions[r].size;
+	/// r+1个region往后的所有region,前移一个region
 	memmove(&type->regions[r], &type->regions[r + 1],
 		(type->cnt - (r + 1)) * sizeof(type->regions[r]));
 	type->cnt--;
@@ -842,11 +844,12 @@ static int __init_memblock memblock_remove_range(struct memblock_type *type,
 	int start_rgn, end_rgn;
 	int i, ret;
 
-///处理内存地址相交情况
+///处理内存地址相交情况,region拆分器
 	ret = memblock_isolate_range(type, base, size, &start_rgn, &end_rgn);
 	if (ret)
 		return ret;
 
+///逆向遍历，移除region
 	for (i = end_rgn - 1; i >= start_rgn; i--)
 		memblock_remove_region(type, i);
 	return 0;
@@ -1973,7 +1976,7 @@ static void __init_memblock __memblock_dump_all(void)
 
 void __init_memblock memblock_dump_all(void)
 {
-	if (memblock_debug)
+	if (!memblock_debug)
 		__memblock_dump_all();
 }
 
