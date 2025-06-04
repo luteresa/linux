@@ -112,6 +112,7 @@ SYM_CODE_START(primary_entry)
 ///切换到EL1模式，以运行kernel
 	bl	init_kernel_el			// w0=cpu_boot_mode
 	mov	x20, x0
+///创建恒等映射,为启动mmu做准备
 	bl	create_idmap
 
 	/*
@@ -394,6 +395,8 @@ SYM_FUNC_START_LOCAL(create_idmap)
 	 * translation level, but the top-level table has more entries.
 	 */
 #endif
+	 ///这里adrp获得的是实际运行时地址，x3=_text在ddr的实际存放地址
+	 ///x0 = (PC & ~0xFFF) + ((symbol - PC) & 0xFFFFFFFFFFFFF000)
 	adrp	x0, init_idmap_pg_dir
 	adrp	x3, _text
 	adrp	x6, _end + MAX_FDT_SIZE + SWAPPER_BLOCK_SIZE
@@ -421,21 +424,6 @@ SYM_FUNC_START_LOCAL(create_idmap)
 	mov	x6, #SWAPPER_BLOCK_SHIFT
 	bl	remap_region
 
-	///调用map_memory宏建立整个内核镜像代码段的映射页表；
-	/**************************************************************************
-	 * 为什么要建第二张表？
-	 * CPU刚启动时，物理内存一般都在低地址(不会超过256T大小)，恒等映射的地址实际在用户空间了，
-	 * 即MMU启用后idmap_pg_dir会调入TTBR0;
-     * 而内核空间的链接地址都是在高地址(内核空间在高地址)，需要填入TTBR1；
-     * 因此，这里再建一张表，映射整个内核镜像，且虚拟地址空间实在高地址区0xffffxxxx xxxx xxxx
-
-     * 注：init_pg_dir和idmap_pg_dir两个页表映射区别：
-     * (1)init_pg_dir映射的虚拟地址在高位0xffff xxxx xxxx xxxx;
-     *   idmap_pg_dir映射的虚拟地址在地位0x0000 xxxx xxxx xxxx;
-     *   MMU启用后，init_pg_dir填入TTBR1,idmap_pg_dir填入TTBR0；
-     * (2)init_pg_dir映射大小是整个内核镜像，idmap_pg_dir映射2M, 只需要过度完成MMU开启即可；
-     ***************************************************************************/
-
 	/* Remap the FDT after the kernel image */
 	adrp	x1, _text
 	adrp	x22, _end + SWAPPER_BLOCK_SIZE
@@ -459,6 +447,22 @@ SYM_FUNC_START_LOCAL(create_idmap)
 	bl	dcache_inval_poc
 	ret	x28
 SYM_FUNC_END(create_idmap)
+
+///调用map_memory宏建立整个内核镜像代码段的映射页表；
+/**************************************************************************
+ * 为什么要建第二张表？
+ * CPU刚启动时，物理内存一般都在低地址(不会超过256T大小)，恒等映射的地址实际在用户空间了，
+ * 即MMU启用后idmap_pg_dir会调入TTBR0;
+ * 而内核空间的链接地址都是在高地址(内核空间在高地址)，需要填入TTBR1；
+ * 因此，这里再建一张表，映射整个内核镜像，且虚拟地址空间实在高地址区0xffffxxxx xxxx xxxx
+
+ * 注：init_pg_dir和idmap_pg_dir两个页表映射区别：
+ * (1)init_pg_dir映射的虚拟地址在高位0xffff xxxx xxxx xxxx;
+ *   idmap_pg_dir映射的虚拟地址在地位0x0000 xxxx xxxx xxxx;
+ *   MMU启用后，init_pg_dir填入TTBR1,idmap_pg_dir填入TTBR0；
+ * (2)init_pg_dir映射大小是整个内核镜像，idmap_pg_dir映射2M, 只需要过度完成MMU开启即可；
+ ***************************************************************************/
+
 
 SYM_FUNC_START_LOCAL(create_kernel_mapping)
 	adrp	x0, init_pg_dir
@@ -917,6 +921,8 @@ SYM_FUNC_START_LOCAL(__primary_switch)
 #endif
 #endif
 	bl	clear_page_tables
+/// 二次映射：
+/// 恒等映射只映射2MB，这里重新映射整个内核镜像	
 	bl	create_kernel_mapping
 
 	adrp	x1, init_pg_dir

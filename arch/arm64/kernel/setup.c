@@ -299,6 +299,9 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 
 	*cmdline_p = boot_command_line;
 
+	pr_notice("---idmap_pg_dir : 0x%16llx\n", idmap_pg_dir);
+	pr_info("---init_pg_dir VA: 0x%px, PA: 0x%pa\n", init_pg_dir, __pa_symbol(init_pg_dir));
+	pr_info("---swapper_pg_dir VA: 0x%px, PA: 0x%pa\n", swapper_pg_dir, __pa_symbol(swapper_pg_dir));
 	/*
 	 * If know now we are going to need KPTI then use non-global
 	 * mappings from the start, avoiding the cost of rewriting
@@ -311,7 +314,6 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	early_ioremap_init();  ///早期ioremap映射,依赖fixmap转换表
 
 	setup_machine_fdt(__fdt_pointer);///设备树映射,读取内存信息后，填入memblock系统，用于后面伙伴系统
-
 	/*
 	 * Initialise the static keys early as they may be enabled by the
 	 * cpufeature code and early parameters.
@@ -352,6 +354,7 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	//paging_init是内存初始化最核心的一步,将完成细粒度内核镜像映射(分别映射每个段),线性映射(内核可以访问整个物理内存)
 	paging_init();   ///建立动态页表
 
+	//pr_info("---3swapper_pg_dir VA: 0x%px, PA: 0x%pa\n", swapper_pg_dir, virt_to_phys(swapper_pg_dir));
 	acpi_table_upgrade();
 
 	/* Parse the ACPI tables for possible boot-time configuration */
