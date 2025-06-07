@@ -1087,6 +1087,7 @@ static bool should_skip_region(struct memblock_type *type,
  * As both region arrays are sorted, the function advances the two indices
  * in lockstep and returns each intersection.
  */
+ ///超找第一个可用块（或页）
 void __next_mem_range(u64 *idx, int nid, enum memblock_flags flags,
 		      struct memblock_type *type_a,
 		      struct memblock_type *type_b, phys_addr_t *out_start,
@@ -1437,6 +1438,7 @@ phys_addr_t __init memblock_alloc_range_nid(phys_addr_t size,
 again:
 	found = memblock_find_in_range_node(size, align, start, end, nid,
 					    flags);
+	///分配的内存快加入reserve，避免重复分配
 	if (found && !memblock_reserve(found, size))
 		goto done;
 

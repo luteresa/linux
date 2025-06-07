@@ -88,7 +88,7 @@ struct memblock_type {
 	///本memblock_type包含regions最大个数
 	unsigned long max;
 	
-	///本memblock_type若有regions总的size
+	///本memblock_type所有regions总的size
 	phys_addr_t total_size;
 
 	///regions数组

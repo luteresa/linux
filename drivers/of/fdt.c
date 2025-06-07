@@ -1326,6 +1326,7 @@ bool __init early_init_dt_scan(void *params)
 	if (!status)
 		return false;
 
+	///扫描物理内存
 	early_init_dt_scan_nodes();
 	return true;
 }

@@ -325,8 +325,6 @@ void __init arm64_memblock_init(void)
 		memblock_remove(0, memstart_addr);
 	}
 
-	pr_info("01memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
-	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
 	/*
 	 * If we are running with a 52-bit kernel VA config on a system that
 	 * does not support it, we have to place the available physical
@@ -401,7 +399,7 @@ void __init arm64_memblock_init(void)
 	 * Register the kernel text, kernel data, initrd, and initial
 	 * pagetables with memblock.
 	 */
-	///将内核设置为reserved类型
+	///将内核镜像存放地址，设置为reserved类型
 	///paging_init()后会释放
 	memblock_reserve(__pa_symbol(_stext), _end - _stext);
 
@@ -419,13 +417,10 @@ void __init arm64_memblock_init(void)
 	///cma具有reuseable属性，则不会从memblock.memory删除
 	early_init_fdt_scan_reserved_mem();
 
-	pr_info("03memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
-	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
+///预留crash kernel地址
 	if (!defer_reserve_crashkernel())
 		reserve_crashkernel();
 
-	pr_info("04memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
-	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
 	///ARM64中不需要高端内存，为了向前兼容，这里将高端内存的起始地址设置为物理内存的结束地址
 	high_memory = __va(memblock_end_of_DRAM() - 1) + 1;
 }

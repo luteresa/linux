@@ -174,14 +174,15 @@ asmlinkage void __init early_fdt_map(u64 dt_phys)
 {
 	int fdt_size;
 
+	pr_notice("---early_fdt_map.\n");
 	early_fixmap_init();
 	early_fdt_ptr = fixmap_remap_fdt(dt_phys, &fdt_size, PAGE_KERNEL);
 }
 
+///完成fdt的pte页表填写，返回fdt虚拟地址，这里虚拟地址事先定义预留
 static void __init setup_machine_fdt(phys_addr_t dt_phys)
 {
 	int size;
-	///完成fdt的pte页表填写，返回fdt虚拟地址，这里虚拟地址事先定义预留
 	///映射了2MB
 	void *dt_virt = fixmap_remap_fdt(dt_phys, &size, PAGE_KERNEL);
 	const char *name;
@@ -190,6 +191,9 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 		///把dtb所占内存添加到memblock管理的reserve模块，后续内存分配不会使用这段内存
 		//使用完后，会使用memblock_free()释放
 		memblock_reserve(dt_phys, size);
+
+	pr_notice("---dt_phys 0x%llx, size:%dKB.\n", dt_phys, size>>10);
+	memblock_dump_all();
 
 	///扫描解析dtb，将内存布局信息填入memblock系统
 	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
@@ -299,9 +303,6 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 
 	*cmdline_p = boot_command_line;
 
-	pr_notice("---idmap_pg_dir : 0x%16llx\n", idmap_pg_dir);
-	pr_info("---init_pg_dir VA: 0x%px, PA: 0x%pa\n", init_pg_dir, __pa_symbol(init_pg_dir));
-	pr_info("---swapper_pg_dir VA: 0x%px, PA: 0x%pa\n", swapper_pg_dir, __pa_symbol(swapper_pg_dir));
 	/*
 	 * If know now we are going to need KPTI then use non-global
 	 * mappings from the start, avoiding the cost of rewriting
@@ -310,10 +311,13 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	arm64_use_ng_mappings = kaslr_requires_kpti();
 
 	///注意这里都是创建的静态页表，因为内存子系统尚未建立(伙伴系统还没开始工作)
-	early_fixmap_init();   ///fixmap区映射,只创建中间级转换页表,最后一级页表未创建
-	early_ioremap_init();  ///早期ioremap映射,依赖fixmap转换表
+	///fixmap区映射,只创建中间级转换页表,最后一级页表未创建
+	early_fixmap_init();
+	///获取早期ioremap映射虚拟地址,依赖fixmap转换表
+	early_ioremap_init();
 
-	setup_machine_fdt(__fdt_pointer);///设备树映射,读取内存信息后，填入memblock系统，用于后面伙伴系统
+	///设备树映射,读取内存信息后，填入memblock系统，用于后面伙伴系统
+	setup_machine_fdt(__fdt_pointer);
 	/*
 	 * Initialise the static keys early as they may be enabled by the
 	 * cpufeature code and early parameters.
@@ -340,9 +344,13 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	if (!efi_enabled(EFI_BOOT) && ((u64)_text % MIN_KIMG_ALIGN) != 0)
 	     pr_warn(FW_BUG "Kernel image misaligned at boot, please fix your bootloader!");
 
+	pr_notice("---before arm64_memblock_init .\n");
+	memblock_dump_all();
+
 	///整理memblock的内存区域
 	arm64_memblock_init();
 
+	pr_notice("---after arm64_memblock_init .\n");
 	memblock_dump_all();
 
 	pr_info("memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
@@ -354,7 +362,6 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	//paging_init是内存初始化最核心的一步,将完成细粒度内核镜像映射(分别映射每个段),线性映射(内核可以访问整个物理内存)
 	paging_init();   ///建立动态页表
 
-	//pr_info("---3swapper_pg_dir VA: 0x%px, PA: 0x%pa\n", swapper_pg_dir, virt_to_phys(swapper_pg_dir));
 	acpi_table_upgrade();
 
 	/* Parse the ACPI tables for possible boot-time configuration */
