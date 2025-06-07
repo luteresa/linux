@@ -24,7 +24,8 @@
  * 1) mem_section	- memory sections, mem_map's for valid memory
  */
 #ifdef CONFIG_SPARSEMEM_EXTREME
-struct mem_section **mem_section;
+ /// 动态分配，根指针
+ struct mem_section **mem_section;
 #else
 struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
 	____cacheline_internodealigned_in_smp;
@@ -79,7 +80,7 @@ static noinline struct mem_section __ref *sparse_index_alloc(int nid)
 	return section;
 }
 
-///进一步动态创建
+///进一步动态创建一个mem_section
 static int __meminit sparse_index_init(unsigned long section_nr, int nid)
 {
 	unsigned long root = SECTION_NR_TO_ROOT(section_nr);
@@ -238,6 +239,9 @@ static void __init memory_present(int nid, unsigned long start, unsigned long en
 		///需要NR_SECTION_ROOTS个一级指针,完整表达46/52位物理内存
 		//ARM64默认预设了一个全局数组
 		size = sizeof(struct mem_section *) * NR_SECTION_ROOTS;
+		pr_notice("---NR_SECTION_ROOTS=%ld,SECTIONS_PER_ROOT=%d, \
+				PAGES_PER_SECTION=%d,size=%ldKB\n", 
+				NR_SECTION_ROOTS,SECTIONS_PER_ROOT,PAGES_PER_SECTION, size>>10);
 		align = 1 << (INTERNODE_CACHE_SHIFT);
 		///分配mem_section空间
 		mem_section = memblock_alloc(size, align);
@@ -339,6 +343,10 @@ static unsigned long usemap_size(void)
 
 size_t mem_section_usage_size(void)
 {
+	///每个pagebloc占3bits(表征页属性，可迁移/不可前移/可回收),每个section256*3=768bits
+	///用unsigned long 64bits来管理，usemap_size()=768/64=128bytes
+	/// 64+128=192bytes,实际打印8+16???
+	pr_info("---struct mem_sec=%ld,usemap_size=%ld\n",sizeof(struct mem_section_usage),usemap_size());
 	return sizeof(struct mem_section_usage) + usemap_size();
 }
 
@@ -429,6 +437,7 @@ static struct mem_section_usage * __init
 sparse_early_usemaps_alloc_pgdat_section(struct pglist_data *pgdat,
 					 unsigned long size)
 {
+	pr_info("---sec size=%ld.\n", size);
 	return memblock_alloc_node(size, SMP_CACHE_BYTES, pgdat->node_id);
 }
 
@@ -536,6 +545,8 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 	unsigned long pnum;
 	struct page *map;
 
+	pr_notice("%s:mem_section_usage_size:%ldbytes,map_count=%d.\n ", __func__, 
+		mem_section_usage_size(),map_count );
 	///该node有map_count个mem_section，也就是有map_count个mem_section_usage
 	usage = sparse_early_usemaps_alloc_pgdat_section(NODE_DATA(nid),
 			mem_section_usage_size() * map_count);
@@ -555,7 +566,9 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 		if (pnum >= pnum_end)
 			break;
 
+		///分配一个section
 		///mem_section对应的struct page起始地址
+		///并建立映射,映射的虚拟地址是多少???
 		map = __populate_section_memmap(pfn, PAGES_PER_SECTION,
 				nid, NULL, NULL);
 		if (!map) {
@@ -571,6 +584,8 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 				SECTION_IS_EARLY);
 		usage = (void *) usage + mem_section_usage_size();
 	}
+
+	/// sparse init完成，释放sparsemap_buf占用内存
 	sparse_buffer_fini();
 	return;
 failed:

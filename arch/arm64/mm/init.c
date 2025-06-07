@@ -437,6 +437,7 @@ void __init bootmem_init(void)
 	//将这些dram通过reserve_bad_mem保留不用，从而保证系统正常boot
 	early_memtest(min << PAGE_SHIFT, max << PAGE_SHIFT);
 
+///初始化全局变量啊，确定物理内存最大/小页帧号
 	max_pfn = max_low_pfn = max;
 	min_low_pfn = min;
 
