@@ -64,6 +64,7 @@ static inline void set_section_nid(unsigned long section_nr, int nid)
 static noinline struct mem_section __ref *sparse_index_alloc(int nid)
 {
 	struct mem_section *section = NULL;
+///一组SECTIONS_PER_ROOT个mem_section
 	unsigned long array_size = SECTIONS_PER_ROOT *
 				   sizeof(struct mem_section);
 
@@ -93,9 +94,11 @@ static int __meminit sparse_index_init(unsigned long section_nr, int nid)
 	 *
 	 * The mem_hotplug_lock resolves the apparent race below.
 	 */
+	 ///已分配过，直接返回
 	if (mem_section[root])
 		return 0;
 
+	 /// root 为第root组section数组,若为空，分配一个section组
 	section = sparse_index_alloc(nid);
 	if (!section)
 		return -ENOMEM;
@@ -232,16 +235,16 @@ static void __init memory_present(int nid, unsigned long start, unsigned long en
 {
 	unsigned long pfn;
 
+	pr_notice("---memory_present:nid=%d,start:%ld,end:%ld\n",nid,start,end);
 #ifdef CONFIG_SPARSEMEM_EXTREME
+	///mem_section只分配一次
 	if (unlikely(!mem_section)) {
 		unsigned long size, align;
-
 		///需要NR_SECTION_ROOTS个一级指针,完整表达46/52位物理内存
 		//ARM64默认预设了一个全局数组
 		size = sizeof(struct mem_section *) * NR_SECTION_ROOTS;
-		pr_notice("---NR_SECTION_ROOTS=%ld,SECTIONS_PER_ROOT=%d, \
-				PAGES_PER_SECTION=%d,size=%ldKB\n", 
-				NR_SECTION_ROOTS,SECTIONS_PER_ROOT,PAGES_PER_SECTION, size>>10);
+		pr_notice("---NR_SECTION_ROOTS=%ld,SECTIONS_PER_ROOT=%d,PAGES_PER_SECTION=%d,sizeof(struct mem_section *)=%ld,size=%ldKB,\n",NR_SECTION_ROOTS,SECTIONS_PER_ROOT,PAGES_PER_SECTION,sizeof(struct mem_section *), size>>10);
+
 		align = 1 << (INTERNODE_CACHE_SHIFT);
 		///分配mem_section空间
 		mem_section = memblock_alloc(size, align);
@@ -260,7 +263,9 @@ static void __init memory_present(int nid, unsigned long start, unsigned long en
 		unsigned long section = pfn_to_section_nr(pfn);
 		struct mem_section *ms;
 
-		///如果section下标对应的一级指针没有分配空间，则在node上分配一页空间
+		pr_notice("---section num=%ld,pfn:%ld\n", section, pfn);
+
+		///如果section下标对应的一级指针没有分配空间，则在node上分配一组section空间
 		sparse_index_init(section, nid);
 		///nid同时保存在section_to_node_table全局数组
 		set_section_nid(section, nid);
@@ -497,7 +502,7 @@ static void __init sparse_buffer_init(unsigned long size, int nid)
 	 * and we want it to be properly aligned to the section size - this is
 	 * especially the case for VMEMMAP which maps memmap to PMDs
 	 */
-	///申请函数返回的是虚拟地址
+	///申请函数返回的是虚拟地址,线性映射虚拟地址
 	sparsemap_buf = memmap_alloc(size, section_map_size(), addr, nid, true);
 	sparsemap_buf_end = sparsemap_buf + size;
 }
@@ -554,10 +559,12 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 		pr_err("%s: node[%d] usemap allocation failed", __func__, nid);
 		goto failed;
 	}
-	///为该节点申请struct page的内存
+	///为该节点申请所有struct page的内存
 	//一个mem_section对应PAGES_PER_SECTION个struct page 
 	//[sparsemap_buf, sparsemap_buf_end]
+	pr_notice("---%s:all_size=%ldKB,nid=%d.struct page size=%ld,pages=%ld\n ", __func__, map_count * section_map_size()>>10, nid, sizeof(struct page),map_count * section_map_size()/sizeof(struct page));
 	sparse_buffer_init(map_count * section_map_size(), nid);
+
 	///初始化node的每一个mem_section
 	for_each_present_section_nr(pnum_begin, pnum) {
 		///计算section下标对应的页帧号,比如nr=1, 对应128M
@@ -609,7 +616,7 @@ void __init sparse_init(void)
 	unsigned long pnum_end, pnum_begin, map_count = 1;
 	int nid_begin;
 
-	///根据memblock.memory信息，初始化mem_section二级指针
+	///根据memblock.memory信息，分配初始化mem_section二级指针
 	memblocks_present();
 
 	///根据section_mem_map标记位判断,找到第一个存在mem_section的下标

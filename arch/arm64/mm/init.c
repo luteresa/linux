@@ -292,6 +292,7 @@ void __init arm64_memblock_init(void)
 		linear_region_size = min_t(u64, linear_region_size, BIT(51));
 	}
 
+	pr_info("---linear_region_size:0x%px .\n",linear_region_size );
 	pr_info("00memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
 	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
 ///移除实际物理地址以上的内存空间区域,比如VA_BITS=48,大于2^48以上地址，memblock不必存在

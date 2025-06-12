@@ -213,6 +213,8 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 	}
 
 	/* Early fixups are done, map the FDT as read-only now */
+	/// 重新映射为只读，为啥不一开始就映射只读？
+	///前期解析dt过程，有些平台或修改
 	fixmap_remap_fdt(dt_phys, &size, PAGE_KERNEL_RO);
 
 	name = of_flat_dt_get_machine_name();
@@ -362,6 +364,8 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	//paging_init是内存初始化最核心的一步,将完成细粒度内核镜像映射(分别映射每个段),线性映射(内核可以访问整个物理内存)
 	paging_init();   ///建立动态页表
 
+	pr_notice("---after paging_init .\n");
+	memblock_dump_all();
 	acpi_table_upgrade();
 
 	/* Parse the ACPI tables for possible boot-time configuration */
@@ -374,6 +378,8 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	///接下来开始初始化内存的关键数据结构，Linux当前默认采用sparse内存模型
 	bootmem_init();
 
+	pr_notice("---after bootmem_init .\n");
+	memblock_dump_all();
 	kasan_init();
 
 	request_standard_resources();
