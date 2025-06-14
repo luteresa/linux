@@ -243,7 +243,12 @@ static void __init memory_present(int nid, unsigned long start, unsigned long en
 		///需要NR_SECTION_ROOTS个一级指针,完整表达46/52位物理内存
 		//ARM64默认预设了一个全局数组
 		size = sizeof(struct mem_section *) * NR_SECTION_ROOTS;
-		pr_notice("---NR_SECTION_ROOTS=%ld,SECTIONS_PER_ROOT=%d,PAGES_PER_SECTION=%d,sizeof(struct mem_section *)=%ld,size=%ldKB,\n",NR_SECTION_ROOTS,SECTIONS_PER_ROOT,PAGES_PER_SECTION,sizeof(struct mem_section *), size>>10);
+		pr_notice("---alloc all mem_section, sizeof(struct mem_section *)=%ld,all size=%ldKB,\n",sizeof(struct mem_section *), size>>10);
+		pr_notice("---NR_SECTION_ROOTS=%ld,SECTIONS_PER_ROOT=%d,PAGES_PER_SECTION=%d,mem size=%ld*%ld*%ld=%ldpages=%dTB\n",
+		NR_SECTION_ROOTS,SECTIONS_PER_ROOT,PAGES_PER_SECTION,
+		NR_SECTION_ROOTS,SECTIONS_PER_ROOT,PAGES_PER_SECTION,
+		NR_SECTION_ROOTS*SECTIONS_PER_ROOT*PAGES_PER_SECTION,
+		NR_SECTION_ROOTS*SECTIONS_PER_ROOT*PAGES_PER_SECTION>>28);
 
 		align = 1 << (INTERNODE_CACHE_SHIFT);
 		///分配mem_section空间
@@ -265,8 +270,10 @@ static void __init memory_present(int nid, unsigned long start, unsigned long en
 
 		pr_notice("---section num=%ld,pfn:%ld\n", section, pfn);
 
-		///如果section下标对应的一级指针没有分配空间，则在node上分配一组section空间
+		///如果section下标对应的一级指针没有分配空间，
+		///则在node上分配一组section空间
 		sparse_index_init(section, nid);
+
 		///nid同时保存在section_to_node_table全局数组
 		set_section_nid(section, nid);
 
@@ -348,10 +355,8 @@ static unsigned long usemap_size(void)
 
 size_t mem_section_usage_size(void)
 {
-	///每个pagebloc占3bits(表征页属性，可迁移/不可前移/可回收),每个section256*3=768bits
-	///用unsigned long 64bits来管理，usemap_size()=768/64=128bytes
-	/// 64+128=192bytes,实际打印8+16???
-	pr_info("---struct mem_sec=%ld,usemap_size=%ld\n",sizeof(struct mem_section_usage),usemap_size());
+	/// 实际打印8+16???
+	pr_info("---(SECTION_BLOCKFLAGS_BITS)=%ld,struct mem_sec=%ldbytes,usemap_size=%ld\n",(SECTION_BLOCKFLAGS_BITS),sizeof(struct mem_section_usage),usemap_size());
 	return sizeof(struct mem_section_usage) + usemap_size();
 }
 
@@ -550,8 +555,9 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 	unsigned long pnum;
 	struct page *map;
 
-	pr_notice("%s:mem_section_usage_size:%ldbytes,map_count=%d.\n ", __func__, 
-		mem_section_usage_size(),map_count );
+	pr_notice("---%s:mem_section_usage_size=%ldbytes, map_count=%d.\n ",
+		__func__, mem_section_usage_size(),map_count);
+
 	///该node有map_count个mem_section，也就是有map_count个mem_section_usage
 	usage = sparse_early_usemaps_alloc_pgdat_section(NODE_DATA(nid),
 			mem_section_usage_size() * map_count);
@@ -562,7 +568,11 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 	///为该节点申请所有struct page的内存
 	//一个mem_section对应PAGES_PER_SECTION个struct page 
 	//[sparsemap_buf, sparsemap_buf_end]
-	pr_notice("---%s:all_size=%ldKB,nid=%d.struct page size=%ld,pages=%ld\n ", __func__, map_count * section_map_size()>>10, nid, sizeof(struct page),map_count * section_map_size()/sizeof(struct page));
+	pr_notice("---%s:nid=%d,all_size=%ldKB,struct page size=%ld,pages=%ld\n ", __func__, nid, map_count * section_map_size()>>10, sizeof(struct page), map_count * section_map_size()/sizeof(struct page));
+
+	///预先一次分配所有struct page,用于辅助内存初始化
+	///后续__populate_section_memmap分配页表和struct page，都会优先从sparse_buffer_init预分配内存取
+	///__populate_section_memmap初始化完所有struct page后，sparse_buffer_init未使用内存，会被释放
 	sparse_buffer_init(map_count * section_map_size(), nid);
 
 	///初始化node的每一个mem_section
@@ -573,9 +583,7 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 		if (pnum >= pnum_end)
 			break;
 
-		///分配一个section
-		///mem_section对应的struct page起始地址
-		///并建立映射,映射的虚拟地址是多少???
+		///分配一个section里的每个struct page，并映射到vmmemmap预设虚拟地址空间
 		map = __populate_section_memmap(pfn, PAGES_PER_SECTION,
 				nid, NULL, NULL);
 		if (!map) {
@@ -592,7 +600,7 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 		usage = (void *) usage + mem_section_usage_size();
 	}
 
-	/// sparse init完成，释放sparsemap_buf占用内存
+	/// sparse init完成，释放sparsemap_buf未使用的内存
 	sparse_buffer_fini();
 	return;
 failed:
@@ -616,7 +624,7 @@ void __init sparse_init(void)
 	unsigned long pnum_end, pnum_begin, map_count = 1;
 	int nid_begin;
 
-	///根据memblock.memory信息，分配初始化mem_section二级指针
+	///根据memblock.memory信息，分配初始化mem_section一级/二级指针
 	memblocks_present();
 
 	///根据section_mem_map标记位判断,找到第一个存在mem_section的下标
@@ -631,18 +639,22 @@ void __init sparse_init(void)
 	for_each_present_section_nr(pnum_begin + 1, pnum_end) {
 		int nid = sparse_early_nid(__nr_to_section(pnum_end));
 
-		///统计nid总共占多少个mem_ection
+		pr_notice("---nid=%d,map_count=%d, pnum_end=%d\n",nid, map_count, pnum_end);
+		///统计第nid个node总共占多少个mem_ection
 		if (nid == nid_begin) {
 			map_count++;
 			continue;
 		}
+		pr_notice("---nid=%d,map_count=%d\n",nid, map_count);
 		/* Init node with sections in range [pnum_begin, pnum_end) */
-		///初始化mem_section[pnum_end,pnum_end)
+		///初始化mem_section[pnum_end,pnum_end),并继续处理下一个node
 		sparse_init_nid(nid_begin, pnum_begin, pnum_end, map_count);
 		nid_begin = nid;
 		pnum_begin = pnum_end;
 		map_count = 1;
 	}
+	pr_notice("---nid_begin=%d, pnum_begin=%d, pnum_end=%d, map_count=%d\n",
+		nid_begin, pnum_begin, pnum_end, map_count);
 	/* cover the last node */
 	sparse_init_nid(nid_begin, pnum_begin, pnum_end, map_count);
 	vmemmap_populate_print_last();

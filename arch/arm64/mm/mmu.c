@@ -1222,6 +1222,7 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node,
 	WARN_ON((start < VMEMMAP_START) || (end > VMEMMAP_END));
 
 	if (!ARM64_KERNEL_USES_PMD_MAPS)
+		///未启用pmd块映射，那就是pte级映射
 		return vmemmap_populate_basepages(start, end, node, altmap);
 
 	do {
@@ -1243,6 +1244,7 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node,
 		if (pmd_none(READ_ONCE(*pmdp))) {
 			void *p = NULL;
 
+			///	分配2MB物理内存，用来存放多个struct page
 			p = vmemmap_alloc_block_buf(PMD_SIZE, node, altmap);
 			if (!p) {
 				if (vmemmap_populate_basepages(addr, next, node, altmap))

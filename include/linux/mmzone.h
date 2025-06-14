@@ -1686,6 +1686,8 @@ static inline unsigned long section_nr_to_pfn(unsigned long sec)
 
 struct mem_section_usage {
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
+	/// 一个section=128MB，一个subsection=2MB
+	/// 占 64 bits = 8bytes
 	DECLARE_BITMAP(subsection_map, SUBSECTIONS_PER_SECTION);
 #endif
 	/* See declaration of similar field in struct zone */
@@ -1774,11 +1776,12 @@ static inline struct mem_section *__nr_to_section(unsigned long nr)
 		return NULL;
 #endif
 
-	///一维的偏移是nr/(PAGE/sizeof(struct mem_section))
-	///SECTION_NR_TO_ROOT(nr):nr在第几个struct mem_section[]数组
+///SECTIONS_PER_ROOT=PAGE/sizeof(mem_section*)
+///一维的偏移=nr/SECTIONS_PER_ROOT
+///nr在第index个struct mem_section[]数组
 
-	///二维偏移是nr&(PAGE/sizeof(mem_section*) - 1)
-	///nr & SECTION_ROOT_MASK:nr在某个struct mem_section[]数组中的第几个struct mem_section
+///二维偏移=nr%SECTIONS_PER_ROOT
+///nr在某个struct mem_section[]数组中的第几个struct mem_section
 	return &mem_section[root][nr & SECTION_ROOT_MASK];
 }
 extern size_t mem_section_usage_size(void);

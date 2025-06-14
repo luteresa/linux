@@ -82,6 +82,7 @@ void * __meminit vmemmap_alloc_block_buf(unsigned long size, int node,
 	if (altmap)
 		return altmap_alloc_block_buf(size, altmap);
 
+/// 优先从sparse_buf_start分配
 	ptr = sparse_buffer_alloc(size);
 	if (!ptr)
 		ptr = vmemmap_alloc_block(size, node);
@@ -254,6 +255,7 @@ static pte_t * __meminit vmemmap_populate_address(unsigned long addr, int node,
 	pmd = vmemmap_pmd_populate(pud, addr, node);
 	if (!pmd)
 		return NULL;
+	///分配struct page在这里
 	pte = vmemmap_pte_populate(pmd, addr, node, altmap, reuse);
 	if (!pte)
 		return NULL;
