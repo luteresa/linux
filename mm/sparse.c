@@ -348,6 +348,10 @@ static void __meminit sparse_init_one_section(struct mem_section *ms,
 	ms->usage = usage;
 }
 
+/// 每个section128MB，按pageorder=10(4MB),分为32个块
+/// 每个pageblock用4bits表征内存属性,32*4=128bits
+/// 128bits-->2个unsigend long
+/// return 2*8=16
 static unsigned long usemap_size(void)
 {
 	return BITS_TO_LONGS(SECTION_BLOCKFLAGS_BITS) * sizeof(unsigned long);
@@ -356,7 +360,7 @@ static unsigned long usemap_size(void)
 size_t mem_section_usage_size(void)
 {
 	/// 实际打印8+16???
-	pr_info("---(SECTION_BLOCKFLAGS_BITS)=%ld,struct mem_sec=%ldbytes,usemap_size=%ld\n",(SECTION_BLOCKFLAGS_BITS),sizeof(struct mem_section_usage),usemap_size());
+	pr_info("---struct mem_sec=%ldbytes,usemap_size=%ld\n",sizeof(struct mem_section_usage),usemap_size());
 	return sizeof(struct mem_section_usage) + usemap_size();
 }
 

@@ -587,6 +587,7 @@ void generic_online_page(struct page *page, unsigned int order)
 	debug_pagealloc_map_pages(page, 1 << order);
 	__free_pages_core(page, order);
 	totalram_pages_add(1UL << order);
+	pr_info("---%s,totalram pages add count:%d\n", __func__, 1UL << order);
 }
 EXPORT_SYMBOL_GPL(generic_online_page);
 

@@ -762,7 +762,9 @@ struct zone {
 	 * Flags for a pageblock_nr_pages block. See pageblock-flags.h.
 	 * In SPARSEMEM, this map is stored in struct mem_section
 	 */
-	unsigned long		*pageblock_flags; ///存储页块的MIGRATE_TYPES类型的内存空间
+	///bitmap:存储页块的MIGRATE_TYPES类型的内存空间
+	///每个pageblock 3bits
+	unsigned long		*pageblock_flags; 
 #endif /* CONFIG_SPARSEMEM */
 
 	/* zone_start_pfn == zone_start_paddr >> PAGE_SHIFT */

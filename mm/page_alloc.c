@@ -1749,8 +1749,11 @@ void __free_pages_core(struct page *page, unsigned int order)
 	 */
 	prefetchw(p);
 	for (loop = 0; loop < (nr_pages - 1); loop++, p++) {
+		///性能优化，提前加载下一个页
 		prefetchw(p + 1);
+		///清除保留标志,可以被分配
 		__ClearPageReserved(p);
+		///设置引用计数为0
 		set_page_count(p, 0);
 	}
 	__ClearPageReserved(p);
@@ -2334,6 +2337,7 @@ void __init init_cma_reserved_pageblock(struct page *page)
 	set_page_refcounted(page);
 	__free_pages(page, pageblock_order);
 
+pr_info("---%s,adjust_managed_page_count=%d\n", __func__, pageblock_nr_pages);
 	adjust_managed_page_count(page, pageblock_nr_pages);
 	page_zone(page)->cma_pages += pageblock_nr_pages;
 }
@@ -7462,7 +7466,7 @@ void __meminit init_currently_empty_zone(struct zone *zone,
 			(unsigned long)zone_idx(zone),
 			zone_start_pfn, (zone_start_pfn + size));
 
-///初始化free_area空链表
+///初始化free_area空链表,未填入内容
 	zone_init_free_lists(zone);
 	zone->initialized = 1;
 }
@@ -7747,6 +7751,9 @@ static unsigned long __init usemap_size(unsigned long zone_start_pfn, unsigned l
 
 static void __ref setup_usemap(struct zone *zone)
 {
+	/// NR_PAGEBLOCK_BITS是一个bitmap
+	/// 每个zone分成多个pageblock，每个pageblock用3bit来标记属性
+	/// 3bits分别对应内存属性：migrate,movable, mirror
 	unsigned long usemapsize = usemap_size(zone->zone_start_pfn,
 					       zone->spanned_pages);
 	zone->pageblock_flags = NULL;
@@ -7927,6 +7934,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat)
 	enum zone_type j;
 	int nid = pgdat->node_id;
 
+///初始化锁等资源
 	pgdat_init_internals(pgdat);
 	pgdat->per_cpu_nodestats = &boot_nodestats;
 

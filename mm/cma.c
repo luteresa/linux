@@ -149,6 +149,8 @@ static int __init cma_init_reserved_areas(void)
 	for (i = 0; i < cma_area_count; i++)
 		cma_activate_area(&cma_areas[i]);
 
+pr_info("--- %s,totalram_pages = %lu KB\n",__func__, totalram_pages() << 2);
+
 	return 0;
 }
 core_initcall(cma_init_reserved_areas);

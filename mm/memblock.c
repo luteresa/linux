@@ -2029,6 +2029,8 @@ static void __init free_unused_memmap(void)
 	unsigned long start, end, prev_end = 0;
 	int i;
 
+///如果开启CONFIG_SPARSEMEM_VMEMMAP，不用手动释放
+///因为SPARSEMEM_VMEMMAP已经是精确映射
 	if (!IS_ENABLED(CONFIG_HAVE_ARCH_PFN_VALID) ||
 	    IS_ENABLED(CONFIG_SPARSEMEM_VMEMMAP))
 		return;
@@ -2056,6 +2058,7 @@ static void __init free_unused_memmap(void)
 		 * If we had a previous bank, and there is a space
 		 * between the current bank and the previous, free it.
 		 */
+		 ///发现有hole，释放掉映射页
 		if (prev_end && prev_end < start)
 			free_memmap(prev_end, start);
 
@@ -2087,7 +2090,7 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
 			order--;
 	    count++;
 		if (count%10==0) {
-			pr_info("---__free_page_memory:start=0x%llx,order=%ld, ffs()=%ld\n",start, order, __ffs(start));
+			pr_info("---%s:start=0x%llx,order=%ld, ffs()=%ld\n", __func__, start, order, __ffs(start));
 		}
 		memblock_free_pages(pfn_to_page(start), start, order); ///添加2^order个页到伙伴系统
 
@@ -2101,6 +2104,9 @@ static unsigned long __init __free_memory_core(phys_addr_t start,
 	unsigned long start_pfn = PFN_UP(start);
 	unsigned long end_pfn = min_t(unsigned long,
 				      PFN_DOWN(end), max_low_pfn);
+
+	pr_info("---start:0x%llx, end=0x%llx,---start_pfn:%ld, end=%ld\n",
+		start, end, start_pfn, end_pfn);
 
 	if (start_pfn >= end_pfn)
 		return 0;
@@ -2140,15 +2146,18 @@ static unsigned long __init free_low_memory_core_early(void)
 
 	memmap_init_reserved_pages();
 
+	memblock_dump_all();
 	/*
 	 * We need to use NUMA_NO_NODE instead of NODE_DATA(0)->node_id
 	 *  because in some case like Node0 doesn't have RAM installed
 	 *  low ram will be on Node1
 	 */
+	 ///遍历所有memblock,返回每个memblock的页帧号
 	for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE, &start, &end,
 				NULL)
 		count += __free_memory_core(start, end);  ///加入伙伴系统
 
+	memblock_dump_all();
 	return count;
 }
 
@@ -2183,12 +2192,17 @@ void __init memblock_free_all(void)
 {
 	unsigned long pages;
 
+///清除未使用(存在hole)的页面映射
 	free_unused_memmap();
+/// 重置zone中有效页统计数据
 	reset_all_zones_managed_pages();
 
-    ///page加入伙伴系统
+ /// memblock可释放的内存加入伙伴系统
 	pages = free_low_memory_core_early();
+///更新系统总物理页统计
+pr_info("---totalram_pages = %llu KB\n", totalram_pages() << 2);
 	totalram_pages_add(pages);
+pr_info("---totalram_pages = %llu KB\n", totalram_pages() << 2);
 }
 
 #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_ARCH_KEEP_MEMBLOCK)

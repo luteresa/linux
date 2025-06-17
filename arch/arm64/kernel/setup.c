@@ -379,7 +379,6 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	bootmem_init();
 
 	pr_notice("---after bootmem_init .\n");
-	memblock_dump_all();
 	kasan_init();
 
 	request_standard_resources();
