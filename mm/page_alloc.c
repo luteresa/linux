@@ -7127,6 +7127,7 @@ static void __init memmap_init_zone_range(struct zone *zone,
 	if (start_pfn >= end_pfn)
 		return;
 
+///初始化未MIGRATE_MOVABLE类型
 	memmap_init_range(end_pfn - start_pfn, nid, zone_id, start_pfn,
 			  zone_end_pfn, MEMINIT_EARLY, NULL, MIGRATE_MOVABLE);
 
@@ -7752,8 +7753,7 @@ static unsigned long __init usemap_size(unsigned long zone_start_pfn, unsigned l
 static void __ref setup_usemap(struct zone *zone)
 {
 	/// NR_PAGEBLOCK_BITS是一个bitmap
-	/// 每个zone分成多个pageblock，每个pageblock用3bit来标记属性
-	/// 3bits分别对应内存属性：migrate,movable, mirror
+	/// 每个zone分成多个pageblock，每个pageblock用4bit来标记MIGRATE_TYPES
 	unsigned long usemapsize = usemap_size(zone->zone_start_pfn,
 					       zone->spanned_pages);
 	zone->pageblock_flags = NULL;
