@@ -726,9 +726,14 @@ struct zone {
 	/* Read-mostly fields */
 
 	/* zone watermarks, access with *_wmark_pages(zone) macros */
-	unsigned long _watermark[NR_WMARK];  ///水位线，包括高水位，低水位，最低水位
-	unsigned long watermark_boost;       ///临时水位线，防止外碎片化的优化
+	///水位线，包括高水位，低水位，最低水位
+	unsigned long _watermark[NR_WMARK];
 
+	///临时水位线，防止外碎片化的优化
+	///默认值15000，当需要boost时，临时上调high水位1.5倍
+	unsigned long watermark_boost;
+
+	///预留给高优先级原子分配（GFP_ATOMIC）的页数
 	unsigned long nr_reserved_highatomic;
 
 	/*
@@ -740,20 +745,26 @@ struct zone {
 	 * recalculated at runtime if the sysctl_lowmem_reserve_ratio sysctl
 	 * changes.
 	 */
-	long lowmem_reserve[MAX_NR_ZONES];///防止页面分配器过度使用低端zone的内存
+	///其他zone借用时,为其保留的物理内存
+	///防止页面分配器过度使用低端zone的内存,避免低zone耗尽
+	long lowmem_reserve[MAX_NR_ZONES];
 
 #ifdef CONFIG_NUMA
 	int node;
 #endif
-	struct pglist_data	*zone_pgdat;    ///指向内存节点
+	///指向内存节点
+	struct pglist_data	*zone_pgdat;  
 
-	struct per_cpu_pages	__percpu *per_cpu_pageset; ///用于维护每个CPU的单页面，申请单个页面时，减少自旋锁的竞争
+	///用于维护每个CPU的单页面，申请单个页面时，减少自旋锁的竞争
+	struct per_cpu_pages	__percpu *per_cpu_pageset;
 
+///每个CPU的zone统计信息
 	struct per_cpu_zonestat	__percpu *per_cpu_zonestats;
 	/*
 	 * the high and batch values are copied to individual pagesets for
 	 * faster access
 	 */
+	 /// per-CPU缓存中的高水位，批数量控制
 	int pageset_high;
 	int pageset_batch;
 
@@ -762,13 +773,14 @@ struct zone {
 	 * Flags for a pageblock_nr_pages block. See pageblock-flags.h.
 	 * In SPARSEMEM, this map is stored in struct mem_section
 	 */
-	///bitmap:存储页块的MIGRATE_TYPES类型的内存空间
-	///每个pageblock 3bits
+	///bitmap:存储页块pageblock的MIGRATE_TYPES类型,是否可迁移，是否被隔离
+	///每个pageblock,一般2MB 
 	unsigned long		*pageblock_flags; 
 #endif /* CONFIG_SPARSEMEM */
 
 	/* zone_start_pfn == zone_start_paddr >> PAGE_SHIFT */
-	unsigned long		zone_start_pfn;  ///zone的起始页帧号
+	///该zone的起始页帧号
+	unsigned long		zone_start_pfn;  
 
 	/*
 	 * spanned_pages is the total pages spanned by the zone, including
@@ -828,9 +840,11 @@ managed_pages = present_pages - reserved_pages;
 	unsigned long		present_early_pages;
 #endif
 #ifdef CONFIG_CMA
+	/// 属于CMA的数量
 	unsigned long		cma_pages;
 #endif
 
+/// zone名字，DMA/Normal等
 	const char		*name;
 
 #ifdef CONFIG_MEMORY_ISOLATION
@@ -839,36 +853,44 @@ managed_pages = present_pages - reserved_pages;
 	 * freepage counting problem due to racy retrieving migratetype
 	 * of pageblock. Protected by zone->lock.
 	 */
+	 ///被隔离的pageblock数量，用于内存迁移
 	unsigned long		nr_isolate_pageblock;
 #endif
 
 #ifdef CONFIG_MEMORY_HOTPLUG
 	/* see spanned/present_pages for more description */
+	/// 支持热插拔
 	seqlock_t		span_seqlock;
 #endif
 
+/// 是否已经初始化
 	int initialized;
 
 	/* Write-intensive fields used from the page allocator */
 	CACHELINE_PADDING(_pad1_);
 
 	/* free areas of different sizes */
-	struct free_area	free_area[MAX_ORDER];   ///伙伴系统所需的核心数据结构，管理空闲页块(page block)链表的数组
+	///伙伴系统所需的核心数据结构，管理空闲页块(page block)链表的数组
+	struct free_area	free_area[MAX_ORDER];
 
 	/* zone flags, see below */
+	///zone标识位，比如是否在relaim中
 	unsigned long		flags;
 
 	/* Primarily protects free_area */
-	spinlock_t		lock;                       ///热门锁，要防止高速缓存造成的内存颠簸
+	///保护free_area, 热门锁，要防止高速缓存造成的内存颠簸
+	spinlock_t		lock;
 
 	/* Write-intensive fields used by compaction and vmstats. */
-	CACHELINE_PADDING(_pad2_);   ///填充cacheline，防止内存颠簸
+	///填充cacheline，防止内存颠簸
+	CACHELINE_PADDING(_pad2_);
 
 	/*
 	 * When free pages are below this point, additional steps are taken
 	 * when reading the number of free pages to avoid per-cpu counter
 	 * drift allowing watermarks to be breached
 	 */
+	 ///per-CPU页面漂移统计矫正值
 	unsigned long percpu_drift_mark;
 
 #if defined CONFIG_COMPACTION || defined CONFIG_CMA
@@ -889,6 +911,7 @@ managed_pages = present_pages - reserved_pages;
 	 */
 	unsigned int		compact_considered;
 	unsigned int		compact_defer_shift;
+	/// 最近压缩时失败的order，影响后续重试
 	int			compact_order_failed;
 #endif
 
@@ -901,7 +924,8 @@ managed_pages = present_pages - reserved_pages;
 
 	CACHELINE_PADDING(_pad3_);
 	/* Zone statistics */
-	atomic_long_t		vm_stat[NR_VM_ZONE_STAT_ITEMS]; ///zone计数值
+	///zone计数值
+	atomic_long_t		vm_stat[NR_VM_ZONE_STAT_ITEMS]; 
 	atomic_long_t		vm_numa_event[NR_VM_NUMA_EVENT_ITEMS];
 } ____cacheline_internodealigned_in_smp;  ///高频调用数据，以L1高速缓存对齐
 
@@ -1163,7 +1187,7 @@ typedef struct pglist_data {
 	///本node， zone的个数
 	int nr_zones; /* number of populated zones in this node */
 #ifdef CONFIG_FLATMEM	/* means !SPARSEMEM */
-	///struct page数组的指针
+	///全节点的struct page数组的入口
 	struct page *node_mem_map;
 #ifdef CONFIG_PAGE_EXTENSION
 	struct page_ext *node_page_ext;
@@ -1186,16 +1210,19 @@ typedef struct pglist_data {
 #endif
 	///本node中内存的起始页帧号
 	unsigned long node_start_pfn;
-	///本node中所有可用物理页page数量
+	///本node中,伙伴系统实际管理的page数量,去除hole
 	unsigned long node_present_pages; /* total number of physical pages */
 	///本node中所有物理页page数量,包括空洞页
 	unsigned long node_spanned_pages; /* total size of physical page
 					     range, including holes */
+	/// 当前node编号
 	int node_id;
+	/// 每个pg_data_t都有一个等待队列
 	wait_queue_head_t kswapd_wait;
 	wait_queue_head_t pfmemalloc_wait;
 
 	/* workqueues for throttling reclaim for different reasons. */
+	///不通回收场景的等待队列，比如写回限速
 	wait_queue_head_t reclaim_wait[NR_VMSCAN_THROTTLE];
 
 	atomic_t nr_writeback_throttled;/* nr of writeback-throttled tasks */
@@ -1206,12 +1233,17 @@ typedef struct pglist_data {
 #endif
 	///负责回收该node内存节点的内核线程，每个node对应一个内核线程kswapd
 	struct task_struct *kswapd;	/* Protected by kswapd_lock */
+
+	/// kswapd扫描的阶数
 	int kswapd_order;
+	///本次回收可操作最大的zone
 	enum zone_type kswapd_highest_zoneidx;
 
+	///运行状态
 	int kswapd_failures;		/* Number of 'reclaimed == 0' runs */
 
 #ifdef CONFIG_COMPACTION
+///当前合并的最大阶
 	int kcompactd_max_order;
 	enum zone_type kcompactd_highest_zoneidx;
 	wait_queue_head_t kcompactd_wait;
@@ -1222,12 +1254,14 @@ typedef struct pglist_data {
 	 * This is a per-node reserve of pages that are not available
 	 * to userspace allocations.
 	 */
+	 ///该node的reserved pages,留给内核紧急使用，不允许普通用户使用
 	unsigned long		totalreserve_pages;
 
 #ifdef CONFIG_NUMA
 	/*
 	 * node reclaim becomes active if more unmapped pages exist.
 	 */
+	 /// 触发node reclaim阈值条件，仅NUMA开启有效
 	unsigned long		min_unmapped_pages;
 	unsigned long		min_slab_pages;
 #endif /* CONFIG_NUMA */
@@ -1244,6 +1278,7 @@ typedef struct pglist_data {
 #endif /* CONFIG_DEFERRED_STRUCT_PAGE_INIT */
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+///透明大页回退时，被拆页面放入这
 	struct deferred_split deferred_split_queue;
 #endif
 
@@ -1269,7 +1304,8 @@ typedef struct pglist_data {
 	 *
 	 * Use mem_cgroup_lruvec() to look up lruvecs.
 	 */
-	struct lruvec		__lruvec;  ///lru链表向量(包括所有，5种lru链表)
+	///该node的lru链表向量(包括所有，5种lru链表)
+	struct lruvec		__lruvec;  
 
 	unsigned long		flags;
 
@@ -1281,7 +1317,10 @@ typedef struct pglist_data {
 	CACHELINE_PADDING(_pad2_);
 
 	/* Per-node vmstats */
+	///统计信息，当前node活动页，脏页，可回收slab等；
 	struct per_cpu_nodestat __percpu *per_cpu_nodestats;
+
+	/// 上面per_cpu统计数据总和，参考/proc/vmstat
 	atomic_long_t		vm_stat[NR_VM_NODE_STAT_ITEMS];
 #ifdef CONFIG_NUMA
 	struct memory_tier __rcu *memtier;
