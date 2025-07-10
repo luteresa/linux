@@ -400,6 +400,8 @@ alternative_else_nop_endif
 	apply_ssbd 0, x0, x1
 	.endif
 
+	/// elr_el1，异常返回地址
+	/// spsr_el1，包括异常返回的级别信息
 	msr	elr_el1, x21			// set up the return data
 	msr	spsr_el1, x22
 	ldp	x0, x1, [sp, #16 * 0]
@@ -500,24 +502,59 @@ tsk	.req	x28		// current thread_info
 
 	.align	11
 SYM_CODE_START(vectors)
+/*
+ * 异常向量表：二维表
+ *
+ * 第一维：按异常发生等级切换划分
+ * arm64四张表类型：
+ *  (1)如果发生异常并不会导致exception level切换，并且使用的栈指针是SP_EL0，那么使用第一张异常向量表。
+ *  (2)如果发生异常并不会导致exception level切换，并且使用的栈指针是SP_EL1/2/3，那么使用第二张异常向量表。
+ *  (3)如果发生异常会导致exception level切换，并且比目的exception level低一级的exception level运行在AARCH64模式，那么使用第三张异常向量表。
+ *  (4)如果发生异常会导致exception level切换，并且比目的exception level低一级的exception level运行在AARCH32模式，那么使用第四张异常向量表。
+
+ * 在Linux中，用户态EL0, 内核态EL1, 结合上面路由规则，可得到如下结论：
+ *  (1)第一章异常向量表，用不到； 因为EL0使用SP_EL0，但发生EL0异常会routing到EL1；
+ *  (2)第二张表，用于CPU运行在EL1即内核态，发生异常时，exception level不发生切换；
+ *  (3)第三张表用于CPU运行在EL0即用户态的AARCH32模式时，发生异常；
+ *  (4)第四张表，用于CPU运行在EL0即用户态的AARCH64时，发生异常；
+ *
+ *
+ * 第二维：按异常类型划分
+ *  (1)同步异常,包括：
+ *    a.系统调用，svc, hvc, SMC等；
+ *    b.MMU引发的异常；
+ *    c.SP和PC对齐检查；
+ *    d.未分配的指令；
+ *
+ *  (2)异步异常：
+ *    a.IRQ中断；
+ *    b.FIQ中断；
+ *    c.SError
+ *   
+ *  linux实现中分4类：即二维表的每个表有4个表项
+ *  sync,IRQ,FIQ,SError
+ *
+ */
 	kernel_ventry	1, t, 64, sync		// Synchronous EL1t
 	kernel_ventry	1, t, 64, irq		// IRQ EL1t
 	kernel_ventry	1, t, 64, fiq		// FIQ EL1t
 	kernel_ventry	1, t, 64, error		// Error EL1t
 
-	///linux异常向量入口，这里是同步异常，kernel_ventry宏展开为el1_sync
+	///linux内核异常向量入口，这里是同步异常，kernel_ventry宏展开为el1_sync
+	/// el1h_64_sync
 	kernel_ventry	1, h, 64, sync		// Synchronous EL1h
 	kernel_ventry	1, h, 64, irq		// IRQ EL1h
 	kernel_ventry	1, h, 64, fiq		// FIQ EL1h
 	kernel_ventry	1, h, 64, error		// Error EL1h
 
-	///aarch64 异常向量入口
+	///aarch64 用户空间发生异常向量入口
+	/// el0t_64_sync
 	kernel_ventry	0, t, 64, sync		// Synchronous 64-bit EL0
 	kernel_ventry	0, t, 64, irq		// IRQ 64-bit EL0
 	kernel_ventry	0, t, 64, fiq		// FIQ 64-bit EL0
 	kernel_ventry	0, t, 64, error		// Error 64-bit EL0
 
-	///aarch32 异常向量入口
+	///aarch32 用户空间发生异常向量入口
 	kernel_ventry	0, t, 32, sync		// Synchronous 32-bit EL0
 	kernel_ventry	0, t, 32, irq		// IRQ 32-bit EL0
 	kernel_ventry	0, t, 32, fiq		// FIQ 32-bit EL0

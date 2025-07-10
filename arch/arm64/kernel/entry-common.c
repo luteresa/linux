@@ -513,6 +513,7 @@ static void noinstr el0_da(struct pt_regs *regs, unsigned long esr)
 
 	enter_from_user_mode(regs);
 	local_daif_restore(DAIF_PROCCTX);
+	/// 异常处理函数
 	do_mem_abort(far, esr, regs);
 	exit_to_user_mode(regs);
 }
@@ -656,6 +657,7 @@ asmlinkage void noinstr el0t_64_sync_handler(struct pt_regs *regs)
 		el0_svc(regs);
 		break;
 	case ESR_ELx_EC_DABT_LOW:
+	/// 用户空间缺页异常入口
 		el0_da(regs, esr);
 		break;
 	case ESR_ELx_EC_IABT_LOW:
