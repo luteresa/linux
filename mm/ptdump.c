@@ -154,6 +154,7 @@ void ptdump_walk_pgd(struct ptdump_state *st, struct mm_struct *mm, pgd_t *pgd)
 
 	mmap_write_lock(mm);
 	while (range->start != range->end) {
+		pr_info("---range[0x%llx, 0x%llx],\n", range->start, range->end);
 		walk_page_range_novma(mm, range->start, range->end,
 				      &ptdump_ops, pgd, st);
 		range++;
