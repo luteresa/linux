@@ -191,7 +191,7 @@ SYM_FUNC_END(clear_page_tables)
 	 *	index:	写入页表的起始索引
 	 *	eindex: 页表结束索引
 	 *	flags:	页表属性
-	 *	inc:	
+	 *	inc:    rtbl偏移，这里简单累加一个page size（分配一个page），作为下一个一级页表	
 	 *	tmp1:	temporary variable
 	 *********************************************************************/
 
@@ -229,10 +229,10 @@ SYM_FUNC_END(clear_page_tables)
  * vstart:虚拟地址的起始地址
  * vend:虚拟地址结束地址；
  * shift各级页表在虚拟地址中的偏移；
- * ptrs：页表项的个数；
+ * order：当前级，最大的页表项个数；
  * istart：vstart索引值；
  * iend:vend索引值；
- * count:页表项个数
+ * count:页表项总个数，可能含多个页表块
  **************************************************************/
 
 	.macro compute_indices, vstart, vend, shift, order, istart, iend, count
@@ -281,22 +281,23 @@ SYM_FUNC_END(clear_page_tables)
 	tst	\vend, #~((1 << (\extra_shift)) - 1)
 	b.eq	.L_\@
 
-	///compute_indices宏计算vstart,vend在页表中的索引值
 	compute_indices \vstart, \vend, #\extra_shift, #(PAGE_SHIFT - 3), \istart, \iend, \count
 	mov \sv, \rtbl
-	///设置页表内容，分别填充一级页表PGD，二级页表PMD, 最后一级页表PT
 	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
 	mov \tbl, \sv
 	.endif
 .L_\@:
+	///compute_indices宏计算vstart,vend在页表中的索引值
 	compute_indices \vstart, \vend, #PGDIR_SHIFT, #\order, \istart, \iend, \count
 	mov \sv, \rtbl
+	///设置页表内容，填充一级页表PGD，
 	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
 	mov \tbl, \sv
 
 #if SWAPPER_PGTABLE_LEVELS > 3
 	compute_indices \vstart, \vend, #PUD_SHIFT, #(PAGE_SHIFT - 3), \istart, \iend, \count
 	mov \sv, \rtbl
+	///这里填充二级页表PUD，
 	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
 	mov \tbl, \sv
 #endif
@@ -304,12 +305,14 @@ SYM_FUNC_END(clear_page_tables)
 #if SWAPPER_PGTABLE_LEVELS > 2
 	compute_indices \vstart, \vend, #SWAPPER_TABLE_SHIFT, #(PAGE_SHIFT - 3), \istart, \iend, \count
 	mov \sv, \rtbl
+	///这里填充三级页表PMD，
 	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
 	mov \tbl, \sv
 #endif
 
 	compute_indices \vstart, \vend, #SWAPPER_BLOCK_SHIFT, #(PAGE_SHIFT - 3), \istart, \iend, \count
 	bic \rtbl, \phys, #SWAPPER_BLOCK_SIZE - 1
+	///这里填充四级页表pte，
 	populate_entries \tbl, \rtbl, \istart, \iend, \flags, #SWAPPER_BLOCK_SIZE, \tmp
 	.endm
 
@@ -412,6 +415,10 @@ SYM_FUNC_START_LOCAL(create_idmap)
  * x3： __idmap_text_start
  * x4： PTRS_PER_PGD
 */
+/*
+ * 补充：启动早起，先批量创建pgd页表，然后一次建所有pud,再所有pmd；
+ *       系统运行起来后，这是按需“深挖”，pgd->pud->pmd->pte，再建下一个页表；
+ */
 
 	map_memory x0, x1, x3, x6, x7, x3, IDMAP_PGD_ORDER, x10, x11, x12, x13, x14, EXTRA_SHIFT
 
@@ -522,6 +529,7 @@ SYM_FUNC_START_LOCAL(__primary_switched)
 	init_cpu_task x4, x5, x6
 
 	adr_l	x8, vectors			// load VBAR_EL1 with virtual
+	///异常向量表地址，写入vbar_el1
 	msr	vbar_el1, x8			// vector table address
 	isb
 
