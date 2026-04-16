@@ -1944,6 +1944,7 @@ static void __init_memblock memblock_dump(struct memblock_type *type)
 	struct memblock_region *rgn;
 
 	pr_info(" %s.cnt  = 0x%lx\n", type->name, type->cnt);
+	pr_info(" %s.totalsize  = %lldMB\n", type->name, type->total_size>>20);
 
 	for_each_memblock_type(idx, type, rgn) {
 		char nid_buf[32] = "";
@@ -1978,7 +1979,7 @@ static void __init_memblock __memblock_dump_all(void)
 
 void __init_memblock memblock_dump_all(void)
 {
-	if (!memblock_debug)
+	if (memblock_debug)
 		__memblock_dump_all();
 }
 

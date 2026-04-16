@@ -1260,7 +1260,8 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
 		size -= phys_offset - base;
 		base = phys_offset;
 	}
-	pr_warn("\n---memblock_add base:0x%llx, size=%dMB", base, size>>20);
+	/// add all phy memory
+	printk("\n---memblock_add base:0x%llx, size=%lldMB", base, size>>20);
 	memblock_add(base, size);
 }
 

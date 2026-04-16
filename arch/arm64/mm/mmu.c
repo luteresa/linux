@@ -1306,6 +1306,7 @@ static inline pte_t *fixmap_pte(unsigned long addr)
 ///创建fixmap的前三级页表，
 //pgd:全局共用,swapper_pg_dir;
 //pud,pmd:预先定义好(物理内存管理系统尚未创立),定义在内核的.bss段，而内核镜像已经做了粗粒度映射，可以直接访问；
+
 //这里没有创建pte页表，因为这里映射的是块内存2MB,比如DTB，在fixmap_remap_fdt函数建立
 void __init early_fixmap_init(void)
 {
@@ -1315,13 +1316,13 @@ void __init early_fixmap_init(void)
 	pmd_t *pmdp;
 	unsigned long addr = FIXADDR_START;   ///FIXADDR_START,fixed map区域起始地址，定义在arch/arm64/include/asm/fixmap.h
 
-	pgdp = pgd_offset_k(addr);  ///获得pgd页表项,pgd页表，内核只有一个PGD
-
+	pgdp = pgd_offset_k(addr);  ///获得pgd页表项,pgd页表，内核只有一个PGD, init_mm
 	pr_notice("---FIXADDR_START : 0x%16llx\n", addr);
 	pr_notice("---init_mm.pgd : 0x%16llx\n", init_mm.pgd);
 	pr_notice("---pgdp : 0x%16llx\n", pgdp);
 	pr_info("---init_pg_dir VA: 0x%px, PA: 0x%llx\n", init_pg_dir, virt_to_phys(init_pg_dir));
 	pr_info("---swapper_pg_dir VA: 0x%px, PA: 0x%llx\n", swapper_pg_dir, virt_to_phys(swapper_pg_dir));
+
 	p4dp = p4d_offset(pgdp, addr);   
 	p4d = READ_ONCE(*p4dp);
 	if (CONFIG_PGTABLE_LEVELS > 3 &&
@@ -1337,7 +1338,7 @@ void __init early_fixmap_init(void)
 		if (p4d_none(p4d))
 			///将bm_pud物理地址写入pgd全局页表中
 			__p4d_populate(p4dp, __pa_symbol(bm_pud), P4D_TYPE_TABLE);   ///填充p4d表项
-		pudp = fixmap_pud(addr);   ///获得pud表项
+		pudp = fixmap_pud(addr);   ///获得pud表项地址
 	}
 	if (pud_none(READ_ONCE(*pudp)))
 		///将bm_pmd写入pud页表目录中
