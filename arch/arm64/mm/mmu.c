@@ -1317,9 +1317,9 @@ void __init early_fixmap_init(void)
 	unsigned long addr = FIXADDR_START;   ///FIXADDR_START,fixed map区域起始地址，定义在arch/arm64/include/asm/fixmap.h
 
 	pgdp = pgd_offset_k(addr);  ///获得pgd页表项,pgd页表，内核只有一个PGD, init_mm
-	pr_notice("---FIXADDR_START : 0x%16llx\n", addr);
-	pr_notice("---init_mm.pgd : 0x%16llx\n", init_mm.pgd);
-	pr_notice("---pgdp : 0x%16llx\n", pgdp);
+	pr_notice("---FIXADDR_START : 0x%px\n", (void*)addr);
+	pr_notice("---init_mm.pgd   : 0x%px\n", init_mm.pgd);
+	pr_notice("---pgdp          : 0x%px\n", pgdp);
 	pr_info("---init_pg_dir VA: 0x%px, PA: 0x%llx\n", init_pg_dir, virt_to_phys(init_pg_dir));
 	pr_info("---swapper_pg_dir VA: 0x%px, PA: 0x%llx\n", swapper_pg_dir, virt_to_phys(swapper_pg_dir));
 

@@ -292,7 +292,7 @@ void __init arm64_memblock_init(void)
 		linear_region_size = min_t(u64, linear_region_size, BIT(51));
 	}
 
-	pr_info("---linear_region_size:0x%px .\n",linear_region_size );
+	pr_info("---linear_region_size:0x%llx.\n",linear_region_size );
 	pr_info("00memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
 	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
 ///移除实际物理地址以上的内存空间区域,比如VA_BITS=48,大于2^48以上地址，memblock不必存在
@@ -403,6 +403,7 @@ void __init arm64_memblock_init(void)
 	///将内核镜像存放地址，设置为reserved类型
 	///paging_init()后会释放
 	memblock_reserve(__pa_symbol(_stext), _end - _stext);
+	pr_info("in %s: reserve kernel addr: 0x%llx , size=%luMB\n", __func__, __pa_symbol(_stext), (unsigned long)(_end - _stext)>>20);
 
 	pr_info("02memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
 	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
@@ -497,7 +498,7 @@ void __init mem_init(void)
 /*
  * 打印内存布局
  */
-	#define MLK(b, t) b, t, ((t) - (b)) >> 10
+#define MLK(b, t) b, t, ((t) - (b)) >> 10
 #define MLM(b, t) b, t, ((t) - (b)) >> 20
 #define MLG(b, t) b, t, ((t) - (b)) >> 30
 #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
@@ -537,15 +538,15 @@ void __init mem_init(void)
 		    (unsigned long)high_memory));
 	pr_notice("    PAGE_OFFSET  : 0x%16lx\n",
 		PAGE_OFFSET);
-	pr_notice("    _stext : 0x%16llx\n", _stext);
+	pr_notice("    _stext : 0x%pS\n", _stext);
 	pr_notice("    PHYS_OFFSET  : 0x%llx\n", PHYS_OFFSET);
 	pr_notice("    start memory  : 0x%llx\n",
 		memblock_start_of_DRAM());
 
-	pr_notice("      .idmap_text : 0x%16llx" " - 0x%16llx" "	 (%6lld KB)\n",
+	pr_notice("      .idmap_text : 0x%llux" " - 0x%llux" "	 (%6lld KB)\n",
 		MLK_ROUNDUP((u64)__idmap_text_start, (u64)__idmap_text_end));
-	pr_notice("---idmap_pg_dir : 0x%16llx\n", idmap_pg_dir);
-	pr_notice("---swapper_pg_dir : 0x%16llx\n", swapper_pg_dir);
+	pr_notice("---idmap_pg_dir : 0x%px\n", idmap_pg_dir);
+	pr_notice("---swapper_pg_dir : 0x%px\n", swapper_pg_dir);
 #undef MLK
 #undef MLM
 #undef MLK_ROUNDUP

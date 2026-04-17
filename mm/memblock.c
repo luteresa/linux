@@ -1958,8 +1958,11 @@ static void __init_memblock memblock_dump(struct memblock_type *type)
 			snprintf(nid_buf, sizeof(nid_buf), " on node %d",
 				 memblock_get_region_node(rgn));
 #endif
-		pr_info(" %s[%#x]\t[%pa-%pa], %pa bytes%s flags: %#x\n",
-			type->name, idx, &base, &end, &size, nid_buf, flags);
+		pr_info(" %s[%#x]\t[%pa-%pa], %pa bytes(%llu KB, %llu MB) %s flags: %#x\n",
+			type->name, idx, &base, &end, &size, 
+			(unsigned long long)(size >> 10),
+			(unsigned long long)(size >> 20),
+			nid_buf, flags);
 	}
 }
 
