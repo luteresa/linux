@@ -159,7 +159,7 @@ static __refdata struct memblock_type *memblock_memory = &memblock.memory;
 
 #define memblock_dbg(fmt, ...)						\
 	do {								\
-		if (memblock_debug)					\
+		if (!memblock_debug)					\
 			pr_info(fmt, ##__VA_ARGS__);			\
 	} while (0)
 
@@ -2091,7 +2091,7 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
 			order--;
 	    count++;
 		if (count%10==0) {
-			pr_info("---%s:start=0x%llx,order=%ld, ffs()=%ld\n", __func__, start, order, __ffs(start));
+			pr_info("---%s:start=0x%lx,order=%d, ffs()=%ld\n", __func__, start, order, __ffs(start));
 		}
 		memblock_free_pages(pfn_to_page(start), start, order); ///添加2^order个页到伙伴系统
 
@@ -2201,9 +2201,9 @@ void __init memblock_free_all(void)
  /// memblock可释放的内存加入伙伴系统
 	pages = free_low_memory_core_early();
 ///更新系统总物理页统计
-pr_info("---totalram_pages = %llu KB\n", totalram_pages() << 2);
+pr_info("---totalram_pages = %lu KB\n", totalram_pages() << 2);
 	totalram_pages_add(pages);
-pr_info("---totalram_pages = %llu KB\n", totalram_pages() << 2);
+pr_info("---totalram_pages = %lu KB\n", totalram_pages() << 2);
 }
 
 #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_ARCH_KEEP_MEMBLOCK)
