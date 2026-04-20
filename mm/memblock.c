@@ -159,7 +159,7 @@ static __refdata struct memblock_type *memblock_memory = &memblock.memory;
 
 #define memblock_dbg(fmt, ...)						\
 	do {								\
-		if (!memblock_debug)					\
+		if (memblock_debug)					\
 			pr_info(fmt, ##__VA_ARGS__);			\
 	} while (0)
 

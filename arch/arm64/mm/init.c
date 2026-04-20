@@ -465,9 +465,13 @@ void __init bootmem_init(void)
 	 */
 	///sparse内存模型初始化；
 	sparse_init();
+	pr_info("---after sparse_init\n");
+	memblock_dump_all();
 
 	///初始化zone数据结构
 	zone_sizes_init();
+	pr_info("---after zone_sizes_init\n");
+	memblock_dump_all();
 
 	/*
 	 * Reserve the CMA area after arm64_dma_phys_limit was initialised.

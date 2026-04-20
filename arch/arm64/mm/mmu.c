@@ -1250,6 +1250,7 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node,
 			void *p = NULL;
 
 			///	分配2MB物理内存，用来存放多个struct page
+			/// 从sparse_init预分配的16MB内存获取
 			p = vmemmap_alloc_block_buf(PMD_SIZE, node, altmap);
 			if (!p) {
 				if (vmemmap_populate_basepages(addr, next, node, altmap))

@@ -446,6 +446,7 @@ void *memblock_alloc_try_nid(phys_addr_t size, phys_addr_t align,
 			     int nid);
 
 ///物理内存已经映射过，返回分配的物理地址对应虚拟地址，即可访问
+///从memblock分配
 static __always_inline void *memblock_alloc(phys_addr_t size, phys_addr_t align)
 {
 	return memblock_alloc_try_nid(size, align, MEMBLOCK_LOW_LIMIT,

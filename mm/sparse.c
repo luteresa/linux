@@ -81,7 +81,7 @@ static noinline struct mem_section __ref *sparse_index_alloc(int nid)
 	return section;
 }
 
-///进一步动态创建一个mem_section
+///动态创建一个mem_section组
 static int __meminit sparse_index_init(unsigned long section_nr, int nid)
 {
 	unsigned long root = SECTION_NR_TO_ROOT(section_nr);
@@ -95,10 +95,13 @@ static int __meminit sparse_index_init(unsigned long section_nr, int nid)
 	 * The mem_hotplug_lock resolves the apparent race below.
 	 */
 	 ///已分配过，直接返回
-	if (mem_section[root])
+	if (mem_section[root]) {
+		pr_info("---section_nr_%lu,-> root_%lu is present.\n", section_nr, root);
 		return 0;
+	}
 
 	 /// root 为第root组section数组,若为空，分配一个section组
+	 ///默认是4K, 一个页
 	section = sparse_index_alloc(nid);
 	if (!section)
 		return -ENOMEM;
@@ -235,7 +238,7 @@ static void __init memory_present(int nid, unsigned long start, unsigned long en
 {
 	unsigned long pfn;
 
-	pr_notice("---memory_present:nid=%d,start:%ld,end:%ld\n",nid,start,end);
+	pr_notice("---%s:nid=%d,start_pfn:%ld,end_pfn:%ld\n", __func__, nid, start, end);
 #ifdef CONFIG_SPARSEMEM_EXTREME
 	///mem_section只分配一次
 	if (unlikely(!mem_section)) {
@@ -243,15 +246,15 @@ static void __init memory_present(int nid, unsigned long start, unsigned long en
 		///需要NR_SECTION_ROOTS个一级指针,完整表达46/52位物理内存
 		//ARM64默认预设了一个全局数组
 		size = sizeof(struct mem_section *) * NR_SECTION_ROOTS;
-		pr_notice("---alloc all mem_section, sizeof(struct mem_section *)=%ld,all size=%ldKB,\n",sizeof(struct mem_section *), size>>10);
-		pr_notice("---NR_SECTION_ROOTS=%ld,SECTIONS_PER_ROOT=%d,PAGES_PER_SECTION=%d,mem size=%ld*%ld*%ld=%ldpages=%dTB\n",
+		pr_notice("---alloc all mem_section, sizeof(struct mem_section *)=%ld,all size=%lu bytes, %luKB,\n",sizeof(struct mem_section *),size, size>>10);
+		pr_notice("---NR_SECTION_ROOTS=%ld,SECTIONS_PER_ROOT=%ld,\nPAGES_PER_SECTION=%ld,\nmax mem size=%ld*%ld*%ld=%ldpages=%ldTB\n",
 		NR_SECTION_ROOTS,SECTIONS_PER_ROOT,PAGES_PER_SECTION,
 		NR_SECTION_ROOTS,SECTIONS_PER_ROOT,PAGES_PER_SECTION,
 		NR_SECTION_ROOTS*SECTIONS_PER_ROOT*PAGES_PER_SECTION,
 		NR_SECTION_ROOTS*SECTIONS_PER_ROOT*PAGES_PER_SECTION>>28);
 
 		align = 1 << (INTERNODE_CACHE_SHIFT);
-		///分配mem_section空间
+		///分配mem_section一级指针,128k=section_root个数*8
 		mem_section = memblock_alloc(size, align);
 		if (!mem_section)
 			panic("%s: Failed to allocate %lu bytes align=0x%lx\n",
@@ -317,8 +320,10 @@ static void __init memblocks_present(void)
  */
 static unsigned long sparse_encode_mem_map(struct page *mem_map, unsigned long pnum)
 {
-	///当前mem_section对应的page_struct地址，减去本mem_section的pfn(struct page 指针向前pfn个单位)
-	//得到的是全局struct的起始地址,后续转换时，也可由此得到全局的pfn
+	///当前mem_section对应的page_struct地址，减去本mem_section的起始pfn
+	//得到的是全局struct的起始地址, 后续转换时，也可方便由全局的pfn得到对应struct page
+
+	///这里的减法, 移动的是指针，等效于struct page 指针向前移动pfn个单位
 	unsigned long coded_mem_map =
 		(unsigned long)(mem_map - (section_nr_to_pfn(pnum)));
 	BUILD_BUG_ON(SECTION_MAP_LAST_BIT > PFN_SECTION_SHIFT);
@@ -480,7 +485,6 @@ struct page __init *__populate_section_memmap(unsigned long pfn,
 	unsigned long size = section_map_size();
 	struct page *map = sparse_buffer_alloc(size);
 	phys_addr_t addr = __pa(MAX_DMA_ADDRESS);
-
 	if (map)
 		return map;
 
@@ -559,7 +563,7 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 	unsigned long pnum;
 	struct page *map;
 
-	pr_notice("---%s:mem_section_usage_size=%ldbytes, map_count=%d.\n ",
+	pr_notice("---%s:mem_section_usage_size=%ldbytes, map_count=%ld.\n ",
 		__func__, mem_section_usage_size(),map_count);
 
 	///该node有map_count个mem_section，也就是有map_count个mem_section_usage
@@ -583,6 +587,7 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 	for_each_present_section_nr(pnum_begin, pnum) {
 		///计算section下标对应的页帧号,比如nr=1, 对应128M
 		unsigned long pfn = section_nr_to_pfn(pnum);
+		pr_info("---%s,pfn:%lu, pnum_bein=%lu, pnum=%lu\n", __func__, pfn, pnum_begin, pnum);
 
 		if (pnum >= pnum_end)
 			break;
@@ -643,13 +648,13 @@ void __init sparse_init(void)
 	for_each_present_section_nr(pnum_begin + 1, pnum_end) {
 		int nid = sparse_early_nid(__nr_to_section(pnum_end));
 
-		pr_notice("---nid=%d,map_count=%d, pnum_end=%d\n",nid, map_count, pnum_end);
+		pr_notice("---nid=%d,map_count=%lu, pnum_end=%lu\n",nid, map_count, pnum_end);
 		///统计第nid个node总共占多少个mem_ection
 		if (nid == nid_begin) {
 			map_count++;
 			continue;
 		}
-		pr_notice("---nid=%d,map_count=%d\n",nid, map_count);
+		pr_notice("---nid=%d,map_count=%lu\n",nid, map_count);
 		/* Init node with sections in range [pnum_begin, pnum_end) */
 		///初始化mem_section[pnum_end,pnum_end),并继续处理下一个node
 		sparse_init_nid(nid_begin, pnum_begin, pnum_end, map_count);
@@ -657,7 +662,7 @@ void __init sparse_init(void)
 		pnum_begin = pnum_end;
 		map_count = 1;
 	}
-	pr_notice("---nid_begin=%d, pnum_begin=%d, pnum_end=%d, map_count=%d\n",
+	pr_notice("---nid_begin=%d, pnum_begin=%lu, pnum_end=%lu, map_count=%lu\n",
 		nid_begin, pnum_begin, pnum_end, map_count);
 	/* cover the last node */
 	sparse_init_nid(nid_begin, pnum_begin, pnum_end, map_count);

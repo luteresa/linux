@@ -48,6 +48,7 @@ static void * __ref __earlyonly_bootmem_alloc(int node,
 
 void * __meminit vmemmap_alloc_block(unsigned long size, int node)
 {
+ 	pr_info("---%s:%pS\n",  __func__, (void *)_RET_IP_);              
 	/* If the main allocator is up use that, fallback to bootmem. */
 	if (slab_is_available()) {
 		gfp_t gfp_mask = GFP_KERNEL|__GFP_RETRY_MAYFAIL|__GFP_NOWARN;
@@ -176,6 +177,8 @@ pte_t * __meminit vmemmap_pte_populate(pmd_t *pmd, unsigned long addr, int node,
 
 static void * __meminit vmemmap_alloc_block_zero(unsigned long size, int node)
 {
+
+ 	pr_info("---%s:%pS\n",  __func__, (void *)_RET_IP_);              
 	void *p = vmemmap_alloc_block(size, node);
 
 	if (!p)

@@ -1743,8 +1743,9 @@ struct page_ext;
  * struct mem_section **p ---> struct mem_section *p --->struct page*
  * struct mem_section**是一个全局二维指针，每个成员为struct mem_section数组；
 
- * 每个一级指针，指向一个页物理内存，对应PAGE_SIZE/sizeof(struct mem_section)个struct mem_section
- * 配置48bit,30的系统，section最大个数2^30, 每一个section大小2^(48-30)=1G
+ * 每个一级指针，指向一个页物理内存(也就是一个struct mem_section组)，
+ *   对应PAGE_SIZE/sizeof(struct mem_section)个struct mem_section
+ * 配置48bit内存,section系数30的系统，section最大个数2^30, 每一个section大小2^(48-30)=1G
  * 一级指针个数=2^30/(SECTIONS_PER_ROOT)
  * #define SECTIONS_PER_ROOT       (PAGE_SIZE / sizeof (struct mem_section))
 
