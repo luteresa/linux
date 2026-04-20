@@ -133,6 +133,7 @@ static phys_addr_t __init early_pgtable_alloc(int shift)
 	 */
 	///清除临时pte页表项
 	pte_clear_fixmap();
+	pr_info("---%s: phys=%pa size=(%lu KB)\n", __func__, &phys, (unsigned long)(PAGE_SIZE)>>10);
 
 	return phys;
 }
@@ -571,6 +572,8 @@ static void __init map_mem(pgd_t *pgdp)
 	/* map all the memory banks */
 	///映射memblock的所有memory区域，跳过内核text,rodata段
 	///映射到vir_addr=phy_addr-PHYS_OFFSET+PAGE_OFFSET
+	///PAGE_OFFSET=0xffff_0000_0000_0000，
+	////线性映射区大小128T:0xffff_0000_0000_0000~0xffff_07fff_ffff_ffff
 	for_each_mem_range(i, &start, &end) {
 		if (start >= end)
 			break;
@@ -822,9 +825,11 @@ void __init paging_init(void)
 	map_mem(pgdp);
 
 	///解除fixed区域pgd虚拟地址映射
+	///已经可以通过线性映射地址访问
 	pgd_clear_fixmap();
 
 	///将pgd页表的内容切换到swapper_pgd_dir页表
+	///注意，写入的是ttbr1，即内核空间页表根地址寄存器
 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir), init_idmap_pg_dir);
 	///切换内核主进程的pgd地址
 	init_mm.pgd = swapper_pg_dir;

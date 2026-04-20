@@ -403,7 +403,7 @@ void __init arm64_memblock_init(void)
 	///将内核镜像存放地址，设置为reserved类型
 	///paging_init()后会释放
 	memblock_reserve(__pa_symbol(_stext), _end - _stext);
-	pr_info("in %s: reserve kernel addr: 0x%llx , size=%luMB\n", __func__, __pa_symbol(_stext), (unsigned long)(_end - _stext)>>20);
+	pr_info("---in %s: reserve kernel addr: 0x%llx , size=%luMB\n", __func__, __pa_symbol(_stext), (unsigned long)(_end - _stext)>>20);
 
 	pr_info("02memblock.memory.total: %llu MiB\n", memblock.memory.total_size >> 20);
 	pr_info("memblock.reserved.total: %llu MiB\n", memblock_reserved_size() >> 20);
