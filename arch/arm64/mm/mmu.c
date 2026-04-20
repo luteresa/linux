@@ -1426,7 +1426,8 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
 	 */
 	BUILD_BUG_ON(dt_virt_base % SZ_2M);
 
-	///early_fixmap_init()已经建立了pud,pmd,保证fdt所在虚拟地址范围，在范围内,
+	///early_fixmap_init()已经建立了pud,pmd,
+	///保证fdt所在虚拟地址范围，在范围内,
 	BUILD_BUG_ON(__fix_to_virt(FIX_FDT_END) >> SWAPPER_TABLE_SHIFT !=
 		     __fix_to_virt(FIX_BTMAP_BEGIN) >> SWAPPER_TABLE_SHIFT);
 
@@ -1434,8 +1435,8 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
 	dt_virt = (void *)dt_virt_base + offset;
 
 	/* map the first chunk so we can read the size from the header */
-	//根据提供的物理地址和虚拟地址，设置页表项
-	//建立映射，页表物理地址已知的，不能临时分配(因为伙伴系统尚未工作)
+	///根据提供的物理地址和虚拟地址，设置页表项
+	///建立映射，页表物理地址已知的，不能临时分配(因为伙伴系统尚未工作)
 	create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE), 
 			dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
 
