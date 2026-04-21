@@ -476,6 +476,7 @@ void __init bootmem_init(void)
 	/*
 	 * Reserve the CMA area after arm64_dma_phys_limit was initialised.
 	 */
+	 ///从memblock分配cma连续物理内存
 	dma_contiguous_reserve(arm64_dma_phys_limit);
 
 	/*
@@ -485,6 +486,7 @@ void __init bootmem_init(void)
 	if (defer_reserve_crashkernel())
 		reserve_crashkernel();
 
+	pr_info("---after cmd_init\n");
 	memblock_dump_all();
 }
 

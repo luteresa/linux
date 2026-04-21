@@ -1126,6 +1126,7 @@ static inline void __free_one_page(struct page *page,
 	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
 
 	VM_BUG_ON(migratetype == -1);
+	///这个zone，增加2^order个页
 	if (likely(!is_migrate_isolate(migratetype)))
 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
 
@@ -1139,7 +1140,10 @@ static inline void __free_one_page(struct page *page,
 			return;
 		}
 
-		///判断是否为buddy
+		///找buddy,buddy符合以下条件
+		///1. 大小相同，都是 order
+        ///2. 也处于 free 状态
+        ///3. 可以合并
 		buddy = find_buddy_page_pfn(page, pfn, order, &buddy_pfn);
 		if (!buddy)
 			goto done_merging;
@@ -1168,7 +1172,10 @@ static inline void __free_one_page(struct page *page,
 		else
 			del_page_from_free_list(buddy, zone, order);  ///从buddy摘出来
 
-		///合并buddy,继续查找是否可以继续合并, combined_pfn为合并后内存块的起始页帧号
+		///合并buddy,继续查找是否可以继续合并,
+		///combined_pfn为合并后内存块的起始页帧号
+		///page，指向合并后大块起始页
+		///order,增加1
 		combined_pfn = buddy_pfn & pfn;			     
 		page = page + (combined_pfn - pfn);
 		pfn = combined_pfn;
@@ -1186,6 +1193,8 @@ done_merging:
 	else
 		to_tail = buddy_merge_likely(pfn, buddy_pfn, page, order);
 
+///执行"加入free_list"动作
+///FPI_TO_TAIL,强制放链表尾部
 	if (to_tail)
 		add_to_free_list_tail(page, zone, order, migratetype);
 	else
@@ -1719,20 +1728,33 @@ static void __free_pages_ok(struct page *page, unsigned int order,
 	unsigned long pfn = page_to_pfn(page);
 	struct zone *zone = page_zone(page);
 
+///释放前检测
+/*
+1. 检查 page 状态是否允许释放
+2. 检查有没有异常 flags
+3. 检查 refcount/mapcount 等状态
+4. 做 debug 检查，比如 double free 检测
+5. 根据配置处理 KASAN/page poisoning/page owner 等
+6. 清理 page 的一些状态，为进入 buddy 做准备
+*/
 	if (!free_pages_prepare(page, order, true, fpi_flags))
 		return;
 
+///buddy的free_list有多个,获取migratetype 决定放到哪一个list
 	migratetype = get_pfnblock_migratetype(page, pfn);
 
 	spin_lock_irqsave(&zone->lock, flags);
+	///判断是否为普通页
 	if (unlikely(has_isolate_pageblock(zone) ||
 		is_migrate_isolate(migratetype))) {
+		///再读一次，避免把隔离页错误放入普通 free list。
 		migratetype = get_pfnblock_migratetype(page, pfn);
 	}
-	///释放页面，处理相邻页块合并
+	///释放页面，进入buddy算法
 	__free_one_page(page, pfn, zone, order, migratetype, fpi_flags);
 	spin_unlock_irqrestore(&zone->lock, flags);
 
+///更新系统计数，/proc/vmstat
 	__count_vm_events(PGFREE, 1 << order);
 }
 
@@ -1751,20 +1773,35 @@ void __free_pages_core(struct page *page, unsigned int order)
 	for (loop = 0; loop < (nr_pages - 1); loop++, p++) {
 		///性能优化，提前加载下一个页
 		prefetchw(p + 1);
-		///清除保留标志,可以被分配
+		///清除保留标志,可以被分配,
+		///注：只有memblock.memory-memblock.reserved页才会走到这里
 		__ClearPageReserved(p);
 		///设置引用计数为0
 		set_page_count(p, 0);
 	}
+	///单独处理最后一个, 优化性能的工程做法
 	__ClearPageReserved(p);
 	set_page_count(p, 0);
 
+///对应zone增加nr_pages个可管理页
 	atomic_long_add(nr_pages, &page_zone(page)->managed_pages);
 
 	/*
 	 * Bypass PCP and place fresh pages right to the tail, primarily
 	 * relevant for memory onlining.
 	 */
+	 ///真正进入buddy free逻辑
+
+	 ///FPI_TO_TAIL,这些刚初始化出来的页，不走 per-cpu page cache
+     ///直接放到 buddy free list 的尾部
+	 ///这些是刚从 early/memory onlining 阶段释放出来的大批新页；
+     ///放到尾部可以减少它们马上又被分配出去的概率，
+     ///让已有空闲页优先被使用。
+	 ///这对 memory hotplug/onlining 尤其有意义。
+
+	 ///FPI_SKIP_KASAN_POISON:
+	 ///这些页是刚初始化加入 buddy 的，不是普通运行期释放页；
+     ///某些 debug poison 操作可以跳过。
 	__free_pages_ok(page, order, FPI_TO_TAIL | FPI_SKIP_KASAN_POISON);
 }
 
@@ -2337,7 +2374,7 @@ void __init init_cma_reserved_pageblock(struct page *page)
 	set_page_refcounted(page);
 	__free_pages(page, pageblock_order);
 
-pr_info("---%s,adjust_managed_page_count=%d\n", __func__, pageblock_nr_pages);
+pr_info("---%s,adjust_managed_page_count=%lu\n", __func__, pageblock_nr_pages);
 	adjust_managed_page_count(page, pageblock_nr_pages);
 	page_zone(page)->cma_pages += pageblock_nr_pages;
 }
@@ -7062,6 +7099,8 @@ void __ref memmap_init_zone_device(struct zone *zone,
 static void __meminit zone_init_free_lists(struct zone *zone)
 {
 	unsigned int order, t;
+	///初始化每一个order;
+	///每一个order里的每一个free_list链表
 	for_each_migratetype_order(order, t) {
 		INIT_LIST_HEAD(&zone->free_area[order].free_list[t]);
 		zone->free_area[order].nr_free = 0;
@@ -7611,7 +7650,7 @@ unsigned long __init __absent_pages_in_range(int nid,
 		start_pfn = clamp(start_pfn, range_start_pfn, range_end_pfn);
 		end_pfn = clamp(end_pfn, range_start_pfn, range_end_pfn);
 		nr_absent -= end_pfn - start_pfn;
-		pr_debug("---mem[%d], nr_absent=%d,start_pfn=%ld, end_pfn=%ld\n",
+		pr_debug("---mem[%d], nr_absent=%lu,start_pfn=%lu, end_pfn=%ld\n",
 			i, nr_absent,start_pfn, end_pfn);
 	}
 	return nr_absent;
@@ -7709,7 +7748,7 @@ static void __init calculate_node_totalpages(struct pglist_data *pgdat,
 		size = spanned;
 		real_size = size - absent;
 
-		pr_debug("---zone[%d],apanned=%d,absent=%d\n\n", i,size,real_size);
+		pr_debug("---zone[%d]_%s,apanned=%lu,absent=%lu\n", i, zone->name, size, real_size);
 		if (size)
 			zone->zone_start_pfn = zone_start_pfn;
 		else
@@ -8508,7 +8547,7 @@ void __init free_area_init(unsigned long *max_zone_pfn)
 	 * subsection-map relative to active online memory ranges to
 	 * enable future "sub-section" extensions of the memory map.
 	 */
-	 ///打印早起的物理内存地址
+	 ///打印早期的物理内存地址
 	pr_info("Early memory node ranges\n");
 	for_each_mem_pfn_range(i, MAX_NUMNODES, &start_pfn, &end_pfn, &nid) {
 		pr_info("  node %3d: [mem %#018Lx-%#018Lx]\n", nid,

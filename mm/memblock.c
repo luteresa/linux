@@ -2088,6 +2088,7 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
 	int count=0;
 
 	while (start < end) {
+		///选偏小的对齐地址阶数
 		order = min(MAX_ORDER - 1UL, __ffs(start));
 
 		while (start + (1UL << order) > end)
@@ -2131,6 +2132,7 @@ static void __init memmap_init_reserved_pages(void)
 		reserve_bootmem_region(start, end);
 
 	/* and also treat struct pages for the NOMAP regions as PageReserved */
+	///reserve页面的struct page设置reserve属性
 	for_each_mem_region(region) {
 		if (memblock_is_nomap(region)) {
 			start = region->base;
@@ -2156,10 +2158,11 @@ static unsigned long __init free_low_memory_core_early(void)
 	 *  because in some case like Node0 doesn't have RAM installed
 	 *  low ram will be on Node1
 	 */
-	 ///遍历所有memblock,返回每个memblock的页帧号
+	 ///遍历所有memblock,返回每个memblock的起始地址，结束地址
+  	 ///加入伙伴系统
 	for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE, &start, &end,
 				NULL)
-		count += __free_memory_core(start, end);  ///加入伙伴系统
+		count += __free_memory_core(start, end);
 
 	memblock_dump_all();
 	return count;
