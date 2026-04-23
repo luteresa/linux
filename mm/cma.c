@@ -98,6 +98,7 @@ static void __init cma_activate_area(struct cma *cma)
 	unsigned long base_pfn = cma->base_pfn, pfn;
 	struct zone *zone;
 
+///分配cma管理位图，并清零
 	cma->bitmap = bitmap_zalloc(cma_bitmap_maxno(cma), GFP_KERNEL);
 	if (!cma->bitmap)
 		goto out_error;
@@ -153,6 +154,8 @@ pr_info("--- %s,totalram_pages = %lu KB\n",__func__, totalram_pages() << 2);
 
 	return 0;
 }
+
+///cma作为一个模块insmod加入系统
 core_initcall(cma_init_reserved_areas);
 
 void __init cma_reserve_pages_on_error(struct cma *cma)
@@ -353,6 +356,7 @@ int __init cma_declare_contiguous_nid(phys_addr_t base,
 #endif
 
 		if (!addr) {
+			///默认从高往低，寻找并从memblock分配cmd连续物理地址块，标记为reserved
 			addr = memblock_alloc_range_nid(size, alignment, base,
 					limit, nid, true);
 			if (!addr) {
@@ -448,6 +452,7 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 	mask = cma_bitmap_aligned_mask(cma, align);
 	offset = cma_bitmap_aligned_offset(cma, align);
 	bitmap_maxno = cma_bitmap_maxno(cma);
+	///count个page对应到bitmap位图
 	bitmap_count = cma_bitmap_pages_to_bits(cma, count);
 
 	if (bitmap_count > bitmap_maxno)
@@ -455,6 +460,7 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 
 	for (;;) {
 		spin_lock_irq(&cma->lock);
+		///找到连续bitmap_count，也对齐的空地
 		bitmap_no = bitmap_find_next_zero_area_off(cma->bitmap,
 				bitmap_maxno, start, bitmap_count, mask,
 				offset);
@@ -462,6 +468,7 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 			spin_unlock_irq(&cma->lock);
 			break;
 		}
+		///找到候选区域，先设置bitmap位图占用,因为可能并发申请
 		bitmap_set(cma->bitmap, bitmap_no, bitmap_count);
 		/*
 		 * It's safe to drop the lock here. We've marked this region for
@@ -471,7 +478,9 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 		spin_unlock_irq(&cma->lock);
 
 		pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
+		///加互斥锁，确保cma分配串行化
 		mutex_lock(&cma_mutex);
+		///分配页，可能涉及页面迁移,将[pfn, pfn+count)变成一段真正连续，可独占使用的物理页
 		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA,
 				     GFP_KERNEL | (no_warn ? __GFP_NOWARN : 0));
 		mutex_unlock(&cma_mutex);
@@ -479,8 +488,9 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 			page = pfn_to_page(pfn);
 			break;
 		}
-
+///分配失败，清零bitmap
 		cma_clear_bitmap(cma, pfn, count);
+///失败原因是EBUSY，重试,换一块“空地”
 		if (ret != -EBUSY)
 			break;
 
@@ -513,6 +523,7 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 
 	pr_debug("%s(): returned %p\n", __func__, page);
 out:
+///分配成功，统计cma分配成功失败次数
 	if (page) {
 		count_vm_event(CMA_ALLOC_SUCCESS);
 		cma_sysfs_account_success_pages(cma, count);
@@ -567,8 +578,16 @@ bool cma_release(struct cma *cma, const struct page *pages,
 	pfn = page_to_pfn(pages);
 
 	VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
-
+	
+	pr_info("---CMA_RELEASE: cma=%s start_pfn=%lu end_pfn=%lu count=%lu\n",
+        cma->name, pfn, pfn + count - 1, count);
+	pr_info("---CMA_RELEASE_BEFORE: pfn=%lu mt=%lu\n",
+        pfn, get_pageblock_migratetype(pfn_to_page(pfn)));
+///使用完的pageblock，重新释放给buddy系统
 	free_contig_range(pfn, count);
+	pr_info("---CMA_RELEASE_AFTER: pfn=%lu mt=%lu\n",
+        pfn, get_pageblock_migratetype(pfn_to_page(pfn)));
+///清理bitmap位
 	cma_clear_bitmap(cma, pfn, count);
 	trace_cma_release(cma->name, pfn, pages, count);
 

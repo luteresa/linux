@@ -173,6 +173,8 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
 
 	pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
 
+/// selected_size优先从启动参数读取配置大小，
+///没有配置，就选config默认配置(固定大小，或者百分比);
 	if (size_cmdline != -1) {
 		selected_size = size_cmdline;
 		selected_base = base_cmdline;
@@ -438,5 +440,8 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
 
 	return 0;
 }
+EXPORT_SYMBOL(dma_alloc_from_contiguous);
+EXPORT_SYMBOL(dma_release_from_contiguous);
 RESERVEDMEM_OF_DECLARE(cma, "shared-dma-pool", rmem_cma_setup);
+
 #endif

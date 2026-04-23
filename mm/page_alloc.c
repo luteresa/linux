@@ -1052,6 +1052,7 @@ static inline void move_to_free_list(struct page *page, struct zone *zone,
 static inline void del_page_from_free_list(struct page *page, struct zone *zone,
 					   unsigned int order)
 {
+
 	/* clear reported state and update reported page count */
 	if (page_reported(page))
 		__ClearPageReported(page);
@@ -1110,6 +1111,7 @@ buddy_merge_likely(unsigned long pfn, unsigned long buddy_pfn,
  *
  * -- nyc
  */
+
 
 static inline void __free_one_page(struct page *page,
 		unsigned long pfn,
@@ -2359,6 +2361,7 @@ void __init page_alloc_init_late(void)
 }
 
 #ifdef CONFIG_CMA
+///从memory.reserve释放一个pageblock，并配置迁移类型
 /* Free whole pageblock and set its migration type to MIGRATE_CMA. */
 void __init init_cma_reserved_pageblock(struct page *page)
 {
@@ -2370,10 +2373,16 @@ void __init init_cma_reserved_pageblock(struct page *page)
 		set_page_count(p, 0);
 	} while (++p, --i);
 
+///设置pageblock,迁移类型
 	set_pageblock_migratetype(page, MIGRATE_CMA);
 	set_page_refcounted(page);
+///把一整个pageblock释放到buddy系统
 	__free_pages(page, pageblock_order);
 
+///cma早期是memblock-reserved,未统计到managed_pages
+///这里增加zone->managed_pages计数
+///zone->managed_pages,从buddy角度
+///cma_pages，从cma角度
 pr_info("---%s,adjust_managed_page_count=%lu\n", __func__, pageblock_nr_pages);
 	adjust_managed_page_count(page, pageblock_nr_pages);
 	page_zone(page)->cma_pages += pageblock_nr_pages;
@@ -9462,6 +9471,7 @@ int __alloc_contig_migrate_range(struct compact_control *cc,
  * pages which PFN is in [start, end) are allocated for the caller and
  * need to be freed with free_contig_range().
  */
+ ///分配连续物理页，已使用的页，迁移走
 int alloc_contig_range(unsigned long start, unsigned long end,
 		       unsigned migratetype, gfp_t gfp_mask)
 {

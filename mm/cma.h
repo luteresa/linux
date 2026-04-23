@@ -11,11 +11,11 @@ struct cma_kobject {
 };
 
 struct cma {
-	unsigned long   base_pfn;
-	unsigned long   count;
-	unsigned long   *bitmap;
+	unsigned long   base_pfn; ///CMA区域起始PFN
+	unsigned long   count;    ///CMA总页数
+	unsigned long   *bitmap;  ///CMA页占用位图,一个bit表示2^order_per_bit个页
 	unsigned int order_per_bit; /* Order of pages represented by one bit */
-	spinlock_t	lock;
+	spinlock_t	lock;         ///运行时可能多个驱动同时申请，必须加锁
 #ifdef CONFIG_CMA_DEBUGFS
 	struct hlist_head mem_head;
 	spinlock_t mem_head_lock;
