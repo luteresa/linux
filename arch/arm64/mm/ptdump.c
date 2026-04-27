@@ -255,16 +255,22 @@ static void note_page(struct ptdump_state *pt_st, unsigned long addr, int level,
 	static const char units[] = "KMGTPE";
 	u64 prot = 0;
 
+///抽出ptdump关心的bit位,属性摘要
 	if (level >= 0)
 		prot = val & pg_level[level].mask;
 
 	if (st->level == -1) {
+		///第一个段
+		///记录了当前层级，属性，起始地址，marker标题
 		st->level = level;
 		st->current_prot = prot;
 		st->start_address = addr;
+		///对应：---[ Linear Mapping start ]---
 		pt_dump_seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
 	} else if (prot != st->current_prot || level != st->level ||
 		   addr >= st->marker[1].start_address) {
+		///不能和上一段合并
+		///页属性变化，或层级变化，或地址跨越边界
 		const char *unit = units;
 		unsigned long delta;
 
@@ -273,6 +279,8 @@ static void note_page(struct ptdump_state *pt_st, unsigned long addr, int level,
 			note_prot_wx(st, addr);
 		}
 
+///打印地址，比如0xffff000000000000-0xffff000000210000
+///上一个段起始地址，到当前地址(下一个段起始地址)结束
 		pt_dump_seq_printf(st->seq, "0x%016lx-0x%016lx   ",
 				   st->start_address, addr);
 
@@ -281,15 +289,20 @@ static void note_page(struct ptdump_state *pt_st, unsigned long addr, int level,
 			delta >>= 10;
 			unit++;
 		}
+///打印: 2112K PTE
 		pt_dump_seq_printf(st->seq, "%9lu%c %s", delta, *unit,
 				   pg_level[st->level].name);
+///打印其他属性: F     RW NX SHD AF            UXN    MEM/NORMAL-TAGGED 
+
 		if (st->current_prot && pg_level[st->level].bits)
 			dump_prot(st, pg_level[st->level].bits,
 				  pg_level[st->level].num);
 		pt_dump_seq_puts(st->seq, "\n");
 
+///下一个大块,maker指针移动一个
 		if (addr >= st->marker[1].start_address) {
 			st->marker++;
+pr_info("---test,%s, line_%d\n", __func__, __LINE__);
 			pt_dump_seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
 		}
 
@@ -298,8 +311,10 @@ static void note_page(struct ptdump_state *pt_st, unsigned long addr, int level,
 		st->level = level;
 	}
 
+///下一个大块,即使属性没变，地址跨越下一个块，也移动marker
 	if (addr >= st->marker[1].start_address) {
 		st->marker++;
+pr_info("---test,%s, line_%d\n", __func__, __LINE__);
 		pt_dump_seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
 	}
 
@@ -339,6 +354,8 @@ static void __init ptdump_initialize(void)
 				pg_level[i].mask |= pg_level[i].bits[j].mask;
 }
 
+/// cat /sys/kernel/debug/kernel_page_tables
+///ptdump的传入参数
 static struct ptdump_info kernel_ptdump_info = {
 	.mm		= &init_mm,
 	.markers	= address_markers,
