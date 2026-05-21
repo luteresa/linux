@@ -26,11 +26,16 @@ void __iomem *ioremap_prot(phys_addr_t phys_addr, size_t size,
 	/* Page-align mappings */
 	offset = phys_addr & (~PAGE_MASK);
 	phys_addr -= offset;
+	///对齐物理地址
 	size = PAGE_ALIGN(size + offset);
 
+///只针对设备内存?
+///普通ram以及映射，比如phys_to_virt就可以访问；
+///device memory不能cache，
 	if (!ioremap_allowed(phys_addr, size, prot))
 		return NULL;
 
+///申请一个vma
 	area = get_vm_area_caller(size, VM_IOREMAP,
 			__builtin_return_address(0));
 	if (!area)
@@ -38,12 +43,14 @@ void __iomem *ioremap_prot(phys_addr_t phys_addr, size_t size,
 	vaddr = (unsigned long)area->addr;
 	area->phys_addr = phys_addr;
 
+///映射虚拟地址，建立页表
 	if (ioremap_page_range(vaddr, vaddr + size, phys_addr,
 			       __pgprot(prot))) {
 		free_vm_area(area);
 		return NULL;
 	}
 
+///返回可访问虚拟地址
 	return (void __iomem *)(vaddr + offset);
 }
 EXPORT_SYMBOL(ioremap_prot);
