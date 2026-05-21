@@ -20,6 +20,7 @@ static int __init ioremap_demo_init(void)
 	pr_info("demo_ioremap: phys=%pa size=0x%x\n", &phys,
 		DEMO_RTC_SIZE);
 
+///实现申请vma,建立页表
 	rtc_base = ioremap(DEMO_RTC_PHYS, DEMO_RTC_SIZE);
 	if (!rtc_base) {
 		pr_err("demo_ioremap: ioremap failed\n");

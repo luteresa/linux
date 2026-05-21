@@ -36,6 +36,7 @@ void __iomem *ioremap_prot(phys_addr_t phys_addr, size_t size,
 		return NULL;
 
 ///申请一个vma
+///VM_IOREMAP:从vmalloc区域申请vma
 	area = get_vm_area_caller(size, VM_IOREMAP,
 			__builtin_return_address(0));
 	if (!area)
