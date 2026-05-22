@@ -3,6 +3,7 @@
 #include <linux/io.h>
 #include <linux/mm.h>
 #include <linux/pgtable.h>
+#include <linux/delay.h>
 
 #define DEMO_RTC_PHYS   0x09010000UL
 #define DEMO_RTC_SIZE   0x1000
@@ -143,6 +144,7 @@ static int __init ioremap_demo_init(void)
 	u32 dr, mr, lr, cr, imsc;
 	phys_addr_t phys = DEMO_RTC_PHYS;
 
+	msleep(200);
 	pr_info("demo_ioremap: init start\n");
 	pr_info("demo_ioremap: phys=%pa size=0x%x\n", &phys,
 		DEMO_RTC_SIZE);
@@ -154,10 +156,12 @@ static int __init ioremap_demo_init(void)
 		return -ENOMEM;
 	}
 
+	msleep(200);
+
 	pr_info("demo_ioremap: rtc_base=%px\n", rtc_base);
 
-	demo_dump_ttbr1();
-	demo_dump_kernel_va((unsigned long) rtc_base);
+	//demo_dump_ttbr1();
+	//demo_dump_kernel_va((unsigned long) rtc_base);
 
 	dr = readl(rtc_base + RTC_DR);
 	mr = readl(rtc_base + RTC_MR);
