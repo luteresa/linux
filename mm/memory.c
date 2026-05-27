@@ -5233,7 +5233,7 @@ static void lru_gen_exit_fault(void)
  * The mmap_lock may have been released depending on flags and our
  * return value.  See filemap_fault() and __folio_lock_or_retry().
  */
- ///进程地址空间却也异常核心函数，平台无关部分
+ ///进程地址空间缺页异常核心函数，平台无关部分
 vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 			   unsigned int flags, struct pt_regs *regs)
 {

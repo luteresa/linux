@@ -652,11 +652,11 @@ asmlinkage void noinstr el0t_64_sync_handler(struct pt_regs *regs)
 {
 	unsigned long esr = read_sysreg(esr_el1);
 
-	switch (ESR_ELx_EC(esr)) {
+	switch (ESR_ELx_EC(esr)) { ///读取esr_el1的EC域，判断异常类型
 	case ESR_ELx_EC_SVC64:
 		el0_svc(regs);
 		break;
-	case ESR_ELx_EC_DABT_LOW:
+	case ESR_ELx_EC_DABT_LOW: ///0x24,表示Data Abort from a lower Exception level,就是用户空间
 	/// 用户空间缺页异常入口
 		el0_da(regs, esr);
 		break;
