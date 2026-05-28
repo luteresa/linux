@@ -3432,7 +3432,7 @@ static vm_fault_t do_wp_page(struct vm_fault *vmf)
 			return wp_pfn_shared(vmf);   ///复用
 
 		pte_unmap_unlock(vmf->pte, vmf->ptl);
-		return wp_page_copy(vmf); ///vma不是可写共享页面，写时拷贝
+		return wp_page_copy(vmf); ///vma不是可写共享页面,写时拷贝,比如MAP_PRIVATE的mmap，
 	}
 
 	/*
