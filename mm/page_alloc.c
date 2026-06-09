@@ -869,6 +869,7 @@ static inline bool set_page_guard(struct zone *zone, struct page *page,
 	if (!debug_guardpage_enabled())
 		return false;
 
+///低阶才设置guardpage，避免浪费内存
 	if (order >= debug_guardpage_minorder())
 		return false;
 
@@ -1058,8 +1059,10 @@ static inline void del_page_from_free_list(struct page *page, struct zone *zone,
 		__ClearPageReported(page);
 
 	list_del(&page->buddy_list);
+	///清除order块，首页的buddy标记
 	__ClearPageBuddy(page);
 	set_page_private(page, 0);
+	///对应order计数更新
 	zone->free_area[order].nr_free--;
 }
 
@@ -1169,6 +1172,7 @@ static inline void __free_one_page(struct page *page,
 		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
 		 * merge with it and move up one order.
 		 */
+		 ///guard页不能分配，但是可以合并加入伙伴系统
 		if (page_is_guard(buddy))
 			clear_page_guard(zone, buddy, order, migratetype);
 		else
@@ -2632,6 +2636,7 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 	///从order开始，向上查找
 	for (current_order = order; current_order < MAX_ORDER; ++current_order) {
 		area = &(zone->free_area[current_order]);
+		///从当前order获取链表头的page,若不存在(无空闲页)，从更高一阶分配
 		page = get_page_from_free_area(area, migratetype);
 		if (!page)
 			continue;
@@ -3541,6 +3546,7 @@ static void free_unref_page_commit(struct zone *zone, struct per_cpu_pages *pcp,
 	free_high = (pcp->free_factor && order && order <= PAGE_ALLOC_COSTLY_ORDER);
 
 	high = nr_pcp_high(pcp, zone, free_high);
+	///PCP 数量超过 high watermark，批量释放到buddy
 	if (pcp->count >= high) {
 		int batch = READ_ONCE(pcp->batch);
 
