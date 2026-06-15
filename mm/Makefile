@@ -139,3 +139,7 @@ obj-$(CONFIG_IO_MAPPING) += io-mapping.o
 obj-$(CONFIG_HAVE_BOOTMEM_INFO_NODE) += bootmem_info.o
 obj-$(CONFIG_GENERIC_IOREMAP) += ioremap.o
 obj-$(CONFIG_SHRINKER_DEBUG) += shrinker_debug.o
+# mm/Makefile 末尾追加
+CFLAGS_memory.o     += -fno-inline-small-functions -fno-inline-functions-called-once
+CFLAGS_page_alloc.o += -fno-inline-small-functions -fno-inline-functions-called-once
+
