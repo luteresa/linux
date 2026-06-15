@@ -393,6 +393,7 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	 * lock any of the anon_vmas in this anon_vma tree.
 	 */
 	///子进程av的root，指向父进程av的root
+	///共享root:保证一把锁能覆盖整条祖先链
 	anon_vma->root = pvma->anon_vma->root;
 	///子进程av的parent，指向父进程的av
 	anon_vma->parent = pvma->anon_vma;
@@ -402,6 +403,7 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	 * this anon_vma is freed, because the lock lives in the root.
 	 */
 	///增加父进程的anon_vma的_refcount
+	///root必须比子anon_vma活得长，因为锁在root上；
 	get_anon_vma(anon_vma->root);
 	/* Mark this anon_vma as the one where our new (COWed) pages go. */
 	vma->anon_vma = anon_vma;
