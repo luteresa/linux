@@ -3614,6 +3614,7 @@ void free_unref_page_list(struct list_head *list)
 	/* Prepare pages for freeing */
 	list_for_each_entry_safe(page, next, list, lru) {
 		unsigned long pfn = page_to_pfn(page);
+		///校验失败，不再处理
 		if (!free_unref_page_prepare(page, pfn, 0)) {
 			list_del(&page->lru);
 			continue;
@@ -3624,6 +3625,8 @@ void free_unref_page_list(struct list_head *list)
 		 * comment in free_unref_page.
 		 */
 		migratetype = get_pcppage_migratetype(page);
+		///isolated页，绕过PCP，直接进buddy
+		MIGRATE_ISOLATE（例如 CMA/memory hotplug 正在移页时会标）不能进 PCP，必须直接进 buddy，走 free_one_page。
 		if (unlikely(is_migrate_isolate(migratetype))) {
 			list_del(&page->lru);
 			free_one_page(page_zone(page), page, pfn, 0, migratetype, FPI_NONE);
@@ -3631,6 +3634,7 @@ void free_unref_page_list(struct list_head *list)
 		}
 	}
 
+///批量下发PCP
 	list_for_each_entry_safe(page, next, list, lru) {
 		struct zone *zone = page_zone(page);
 

@@ -1837,11 +1837,14 @@ retry:
 			references = folio_check_references(folio, sc);
 
 		switch (references) {
+		///反复被访问，提级到active
 		case FOLIOREF_ACTIVATE:
 			goto activate_locked;
+		///偶尔访问，还不够热，原地保留inactive
 		case FOLIOREF_KEEP:
 			stat->nr_ref_keep += nr_pages;
 			goto keep_locked;
+		///可以回收
 		case FOLIOREF_RECLAIM:
 		case FOLIOREF_RECLAIM_CLEAN:
 			; /* try to reclaim the folio below */
@@ -2590,6 +2593,7 @@ static unsigned long shrink_inactive_list(unsigned long nr_to_scan,
 
 	lru_note_cost(lruvec, file, stat.nr_pageout);
 	mem_cgroup_uncharge_list(&folio_list);
+	///释放回伙伴系统
 	free_unref_page_list(&folio_list);
 
 	/*
@@ -3027,7 +3031,7 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	unsigned long ap, fp;
 	enum lru_list lru;
 
-	///如果没有交换分区，不用扫描匿名页
+	///如果没有swap分区，只扫file
 	/* If we have no swap space, do not bother scanning anon folios. */
 	if (!sc->may_swap || !can_reclaim_anon_pages(memcg, pgdat->node_id, sc)) {
 		scan_balance = SCAN_FILE;
@@ -3041,6 +3045,7 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	 * using the memory controller's swap limit feature would be
 	 * too expensive.
 	 */
+	 /// memcg swappiness=0 → 只扫 file
 	if (cgroup_reclaim(sc) && !swappiness) {
 		scan_balance = SCAN_FILE;
 		goto out;
@@ -3051,6 +3056,7 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	 * system is close to OOM, scan both anon and file equally
 	 * (unless the swappiness setting disagrees with swapping).
 	 */
+	 ///priority 到 0 → 按大小同扫（快 OOM 了不玩策略）
 	if (!sc->priority && swappiness) {
 		scan_balance = SCAN_EQUAL;
 		goto out;
@@ -3060,6 +3066,7 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	 * If the system is almost out of file pages, force-scan anon.
 	 */
 	 ///内存几乎耗光
+	 ///file 快没了 → 强扫 anon
 	if (sc->file_is_tiny) {
 		scan_balance = SCAN_ANON;
 		goto out;
@@ -3069,12 +3076,13 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	 * If there is enough inactive page cache, we do not reclaim
 	 * anything from the anonymous working right now.
 	 */
-	 ///如果inactive file页足够
+	 ///如果inactive file页足够,只扫file
 	if (sc->cache_trim_mode) {
 		scan_balance = SCAN_FILE;
 		goto out;
 	}
 
+/// 常规路径：按分数分配
 	scan_balance = SCAN_FRACT;
 	/*
 	 * Calculate the pressure balance between anon and file pages.
@@ -3091,6 +3099,20 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	 *
 	 * With swappiness at 100, anon and file have equal IO cost.
 	 */
+/*
+ * 看似复杂，本质就两件事：
+  1. swappiness 拉方向（swappiness ∈ [0, 200]）：
+    - 100 → anon/file 各占一半。
+    - 200 → 全压 anon。
+    - 0 → 全压 file。
+  2. cost 反馈拉刹车：
+    - sc->anon_cost / file_cost 是最近这一侧回收付出的 IO 代价（lru_note_cost 从 pageout 数量累积）。
+    - 谁 cost 高，分子里除以更大的值 → 分配到的比例更小。
+    - 但注释里说"at least a third of the pressure is applied"——通过 total_cost + sc->{anon,file}_cost 那个偏置项做了下限保护，防止一侧完全饿死。
+
+  workingset refault 通过 cost 间接影响：refault 事件会调用 lru_note_cost，反过来降低"过度回收侧"的下一轮分压比。
+
+ */
 	total_cost = sc->anon_cost + sc->file_cost;
 	anon_cost = total_cost + sc->anon_cost;
 	file_cost = total_cost + sc->file_cost;
@@ -3106,6 +3128,7 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	fraction[1] = fp;
 	denominator = ap + fp;
 out:
+///第三级：把分数拆到 4 条 LRU
 	for_each_evictable_lru(lru) {
 		int file = is_file_lru(lru);
 		unsigned long lruvec_size;
@@ -6277,9 +6300,10 @@ again:
 	nr_reclaimed = sc->nr_reclaimed;
 	nr_scanned = sc->nr_scanned;
 
+///计算本node各类LRU扫描量
 	prepare_scan_count(pgdat, sc);
 
-	///执行memory cgoup页面回收
+	///执行memory cgoup页面回收， 同时也调用shrink_slab() 回收 slab
 	shrink_node_memcgs(pgdat, sc);
 
 ///slab回收也加上
@@ -6527,6 +6551,7 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 		if (zone->zone_pgdat == last_pgdat)
 			continue;
 		last_pgdat = zone->zone_pgdat;
+		///扫一个node
 		shrink_node(zone->zone_pgdat, sc);
 	}
 
@@ -6591,6 +6616,7 @@ retry:
 		sc->nr_scanned = 0;
 		shrink_zones(zonelist, sc);
 
+///拿够就停止
 		if (sc->nr_reclaimed >= sc->nr_to_reclaim)
 			break;
 
@@ -6603,6 +6629,7 @@ retry:
 		 */
 		if (sc->priority < DEF_PRIORITY - 2)
 			sc->may_writepage = 1;
+///下一轮，扫描page翻倍
 	} while (--sc->priority >= 0);
 
 	last_pgdat = NULL;
