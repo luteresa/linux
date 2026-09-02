@@ -3516,6 +3516,13 @@ void sched_set_stop_task(int cpu, struct task_struct *stop)
 		 * rely on PI working anyway.
 		 */
 		 ///设置显示为FIFO, 实际是stop类, 与老版本一致避免用户confused？
+		 /// 案例：migration线程，显示FF，实际为stop调度类
+		 ///用于softlockup检测
+		 /*
+		 $ ps -o pid,comm,cls -C migration/0
+		     PID COMMAND         CLS
+			 18 migration/0      FF
+		*/
 		sched_setscheduler_nocheck(stop, SCHED_FIFO, &param);
 
 		stop->sched_class = &stop_sched_class;
